@@ -13,7 +13,7 @@ import type {
   ReportType,
   User,
 } from "@/data/types";
-import { todayISO } from "./format";
+import { endOfWeekISO, todayISO } from "./format";
 
 export function isGroupClosed(group: CommunityGroup): boolean {
   return group.status === "closed";
@@ -154,7 +154,10 @@ export interface ReportTypeSummaries {
   };
   nextFellowship: {
     upcomingCount: number;
-    next?: NextFellowship;
+    nextDate?: string;
+    nextDateCount: number;
+    thisWeekCount: number;
+    thisMonthCount: number;
   };
   expenditure: {
     /** Fellowship reports that recorded an expense. */
@@ -188,6 +191,9 @@ export function getReportTypeSummaries(groupId?: string): ReportTypeSummaries {
   for (const r of followUps) byMode[r.mode]++;
 
   const upcoming = getUpcomingFellowships(groupId);
+  const nextDate = upcoming[0]?.proposedDate;
+  const endOfWeek = endOfWeekISO();
+  const thisMonth = today.slice(0, 7);
 
   const withExpenses = fellowships.filter(hasExpense);
   const totalExpenses = sumExpenses(withExpenses);
@@ -208,7 +214,10 @@ export function getReportTypeSummaries(groupId?: string): ReportTypeSummaries {
     },
     nextFellowship: {
       upcomingCount: upcoming.length,
-      next: upcoming[0],
+      nextDate,
+      nextDateCount: upcoming.filter((r) => r.proposedDate === nextDate).length,
+      thisWeekCount: upcoming.filter((r) => r.proposedDate <= endOfWeek).length,
+      thisMonthCount: upcoming.filter((r) => r.proposedDate.startsWith(thisMonth)).length,
     },
     expenditure: {
       count: withExpenses.length,

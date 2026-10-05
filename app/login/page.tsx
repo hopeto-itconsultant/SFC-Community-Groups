@@ -66,15 +66,13 @@ export default function LoginPage() {
                   {u.name}
                 </option>
               ))}
-              {groupsWithUsers.map(({ group, members }) => (
-                <optgroup key={group.id} label={group.name}>
-                  {members.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {group.name} – {roleLabels.get(u.id)}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
+              {groupsWithUsers.flatMap(({ group, members }) =>
+                members.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {group.name} – {roleLabels.get(u.id)}
+                  </option>
+                ))
+              )}
             </select>
           </label>
 

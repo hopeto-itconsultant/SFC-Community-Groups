@@ -395,18 +395,13 @@ function FollowUpTypeBody({ summary }: { summary: ReportTypeSummaries["followUp"
 }
 
 function NextFellowshipTypeBody({ summary }: { summary: ReportTypeSummaries["nextFellowship"] }) {
-  const { next } = summary;
-  if (!next) return <EmptyNote>No upcoming fellowship planned</EmptyNote>;
+  const { nextDate } = summary;
+  if (!nextDate) return <EmptyNote>No upcoming fellowship planned</EmptyNote>;
   return (
-    <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-sm">
-      <div className="flex items-center gap-1.5 font-bold">
-        <CalendarIcon width={16} height={16} className="shrink-0 text-brand-700" />
-        {formatDate(next.proposedDate)}
-      </div>
-      <div className="flex items-center gap-1.5 text-slate-600">
-        <MapPinIcon width={16} height={16} className="shrink-0 text-slate-400" />
-        <span className="truncate">{next.location}</span>
-      </div>
+    <div className="grid grid-cols-3 gap-2">
+      <StatTile value={summary.nextDateCount} label={formatShortDate(nextDate)} />
+      <StatTile value={summary.thisWeekCount} label="This week" />
+      <StatTile value={summary.thisMonthCount} label="This month" />
     </div>
   );
 }
@@ -433,7 +428,7 @@ export type ReportCardKind = ReportType | "expenditure";
 export const CARD_LABELS: Record<ReportCardKind, string> = {
   fellowship: "Fellowships",
   "follow-up": "Follow-ups",
-  "next-fellowship": REPORT_TYPE_LABELS["next-fellowship"],
+  "next-fellowship": "Next Fellowship(s)",
   expenditure: "Expenditures",
 };
 

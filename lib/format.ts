@@ -41,6 +41,13 @@ export function daysAgoISO(days: number): string {
   return toISODate(date);
 }
 
+/** Local calendar date of this coming Sunday (today if it is Sunday). */
+export function endOfWeekISO(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + ((7 - date.getDay()) % 7));
+  return toISODate(date);
+}
+
 /** Local date-time without timezone, e.g. "2026-10-05T17:30:00". */
 export function nowLocalISO(): string {
   const now = new Date();
