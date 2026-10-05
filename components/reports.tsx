@@ -429,7 +429,7 @@ function withLastDate(total: number, word: string, lastDate: string | undefined)
 export type ReportCardKind = ReportType | "expenditure";
 
 export const CARD_LABELS: Record<ReportCardKind, string> = {
-  fellowship: "CG Meets",
+  fellowship: "Fellowships",
   "follow-up": "Follow-ups",
   "next-fellowship": REPORT_TYPE_LABELS["next-fellowship"],
   expenditure: "Expenditures",
