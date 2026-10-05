@@ -7,9 +7,10 @@ import {
   getGroupLeaders,
   getLastFellowship,
   getNextFellowship,
+  isGroupClosed,
 } from "@/lib/data-access";
-import { FREQUENCY_LABELS, NOT_ASSIGNED, formatShortDate } from "@/lib/format";
-import { GroupAvatar } from "./GroupAvatar";
+import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDate } from "@/lib/format";
+import { GroupAvatar, isLocalPreview } from "./GroupAvatar";
 import { ChevronRightIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
@@ -58,8 +59,13 @@ export function StatCard({
   );
 }
 
-function NextFellowshipBadge({ groupId }: { groupId: string }) {
-  const next = getNextFellowship(groupId);
+export function ClosedBadge() {
+  return <Badge tone="slate">Closed</Badge>;
+}
+
+function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
+  if (isGroupClosed(group)) return <ClosedBadge />;
+  const next = getNextFellowship(group.id);
   return next ? (
     <Badge tone="green">Next {formatShortDate(next.proposedDate)}</Badge>
   ) : (
@@ -83,7 +89,7 @@ export function GroupMiniCard({ group }: { group: CommunityGroup }) {
       <div className="flex items-start justify-between gap-1">
         <GroupAvatar group={group} size="sm" />
         <span className="shrink-0 whitespace-nowrap">
-          <NextFellowshipBadge groupId={group.id} />
+          <NextFellowshipBadge group={group} />
         </span>
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{group.name}</p>
@@ -122,12 +128,13 @@ export function GroupDetailCard({ group }: { group: CommunityGroup }) {
             fill
             sizes="(max-width: 576px) 50vw, 288px"
             className="object-cover"
+            unoptimized={isLocalPreview(group.photo)}
           />
         ) : (
           <GroupAvatar group={group} size="lg" />
         )}
         <span className="absolute right-2 top-2 whitespace-nowrap">
-          <NextFellowshipBadge groupId={group.id} />
+          <NextFellowshipBadge group={group} />
         </span>
       </div>
       <div className="p-3">
@@ -177,7 +184,7 @@ export function GroupSummaryRow({ group }: { group: CommunityGroup }) {
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[15px] font-semibold">{group.name}</p>
           <span className="shrink-0 whitespace-nowrap">
-            <NextFellowshipBadge groupId={group.id} />
+            <NextFellowshipBadge group={group} />
           </span>
         </div>
         <p className="truncate text-xs text-slate-500">
@@ -199,7 +206,10 @@ export function GroupListItem({ group }: { group: CommunityGroup }) {
     >
       <GroupAvatar group={group} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-bold">{group.name}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate font-bold">{group.name}</p>
+          {isGroupClosed(group) && <ClosedBadge />}
+        </div>
         <p className="truncate text-sm text-slate-500">
           {group.category ? `${group.category} · ` : ""}
           {FREQUENCY_LABELS[group.frequency]}
@@ -229,17 +239,22 @@ export function GroupProfile({ group }: { group: CommunityGroup }) {
             sizes="(max-width: 576px) 100vw, 576px"
             className="object-cover"
             priority
+            unoptimized={isLocalPreview(group.photo)}
           />
         </div>
       )}
       <div className="flex items-center gap-4">
         {!group.photo && <GroupAvatar group={group} size="lg" />}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold">{group.name}</h2>
           {group.category && <p className="text-slate-500">{group.category}</p>}
         </div>
+        {isGroupClosed(group) && <ClosedBadge />}
       </div>
       <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
+        {isGroupClosed(group) && group.closedAt && (
+          <InfoRow label="Closed">{formatDate(group.closedAt)}</InfoRow>
+        )}
         <InfoRow label="Fellowship">{FREQUENCY_LABELS[group.frequency]}</InfoRow>
         <InfoRow label={leaders.length > 1 ? "Leaders" : "Leader"}>
           <PeopleList people={leaders} />

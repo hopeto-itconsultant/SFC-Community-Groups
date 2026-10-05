@@ -31,6 +31,16 @@ export function todayISO(): string {
   return toISODate(new Date());
 }
 
+/** How far back a fellowship report can be dated. */
+export const REPORT_BACKDATE_DAYS = 7;
+
+/** Local calendar date `days` days before today. */
+export function daysAgoISO(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return toISODate(date);
+}
+
 /** Local date-time without timezone, e.g. "2026-10-05T17:30:00". */
 export function nowLocalISO(): string {
   const now = new Date();

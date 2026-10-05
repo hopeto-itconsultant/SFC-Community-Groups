@@ -6,6 +6,8 @@ export type ContactMode = "call" | "text" | "in-person";
 
 export type ReportType = "fellowship" | "follow-up" | "next-fellowship";
 
+export type GroupStatus = "active" | "closed";
+
 export interface Person {
   id: string;
   name: string;
@@ -28,6 +30,10 @@ export interface CommunityGroup {
   assistantLeaderIds: string[];
   /** Path under /public, e.g. "/groups/womens-cg.jpg". */
   photo?: string;
+  /** Closed groups are kept, with their reports, instead of being deleted. Missing means active. */
+  status?: GroupStatus;
+  /** ISO date the group was closed. */
+  closedAt?: string;
 }
 
 interface ReportBase {
@@ -70,6 +76,8 @@ export interface NextFellowship extends ReportBase {
   location: string;
   activity: string;
   goals: string;
+  /** ISO date-time the plan was cancelled; cancelled plans are kept but no longer upcoming. */
+  cancelledAt?: string;
 }
 
 export type Report = FellowshipReport | FollowUpReport | NextFellowship;

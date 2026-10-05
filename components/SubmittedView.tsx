@@ -4,6 +4,21 @@ import { PageHeader } from "./PageHeader";
 import { ReportDetail } from "./reports";
 import { Button, LinkButton } from "./ui";
 
+/** Green confirmation banner shown after a prototype action that is not persisted. */
+export function SavedBanner({ title }: { title: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800 ring-1 ring-emerald-200">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+        <CheckIcon />
+      </span>
+      <div>
+        <p className="font-bold">{title}</p>
+        <p className="text-sm text-emerald-700">Prototype: this is shown here but not saved.</p>
+      </div>
+    </div>
+  );
+}
+
 export function SubmittedView({
   report,
   title,
@@ -19,15 +34,7 @@ export function SubmittedView({
     <>
       <PageHeader title="Submitted" backHref="/home" />
       <div className="p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800 ring-1 ring-emerald-200">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-            <CheckIcon />
-          </span>
-          <div>
-            <p className="font-bold">{title}</p>
-            <p className="text-sm text-emerald-700">Prototype: this entry is shown here but not saved.</p>
-          </div>
-        </div>
+        <SavedBanner title={title} />
 
         <ReportDetail report={report} />
 

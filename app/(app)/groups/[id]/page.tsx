@@ -1,13 +1,16 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import type { Report } from "@/data/types";
+import { useState } from "react";
+import type { CommunityGroup, Report } from "@/data/types";
 import { GroupProfile } from "@/components/groups";
 import { PageHeader } from "@/components/PageHeader";
 import { NextFellowshipSummary, ReportCard } from "@/components/reports";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
-import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { getGroupById, getNextFellowship, getReports } from "@/lib/data-access";
+import { SavedBanner } from "@/components/SubmittedView";
+import { Button, ConfirmCard, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
+import { getGroupById, getNextFellowship, getReports, isGroupClosed } from "@/lib/data-access";
+import { todayISO } from "@/lib/format";
 
 const RECENT_LIMIT = 3;
 
@@ -32,10 +35,16 @@ function RecentList({ reports, empty }: { reports: Report[]; empty: string }) {
 
 function AdminGroupView() {
   const { id } = useParams<{ id: string }>();
-  const group = getGroupById(id);
-  if (!group) return <NotAvailable message="This group could not be found." />;
+  const stored = getGroupById(id);
+  const [closedNow, setClosedNow] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  if (!stored) return <NotAvailable message="This group could not be found." />;
 
-  const next = getNextFellowship(group.id);
+  const group: CommunityGroup = closedNow
+    ? { ...stored, status: "closed", closedAt: todayISO() }
+    : stored;
+  const closed = isGroupClosed(group);
+  const next = closed ? undefined : getNextFellowship(group.id);
   const fellowships = getReports({ groupId: group.id, type: "fellowship" });
   const followUps = getReports({ groupId: group.id, type: "follow-up" });
 
@@ -43,10 +52,21 @@ function AdminGroupView() {
     <>
       <PageHeader title={group.name} subtitle={group.category} backHref="/groups" />
       <div className="p-4">
-        <GroupProfile group={group} />
+        {closedNow && <SavedBanner title={`${group.name} closed. Past reports are kept.`} />}
 
-        <SectionTitle>Next Fellowship</SectionTitle>
-        {next ? <NextFellowshipSummary report={next} /> : <EmptyState title="Not planned yet" />}
+        <GroupProfile group={group} />
+        {!closed && (
+          <LinkButton href={`/groups/${group.id}/edit`} variant="secondary" block className="mt-3">
+            Edit group profile
+          </LinkButton>
+        )}
+
+        {!closed && (
+          <>
+            <SectionTitle>Next Fellowship</SectionTitle>
+            {next ? <NextFellowshipSummary report={next} /> : <EmptyState title="Not planned yet" />}
+          </>
+        )}
 
         <SectionTitle>Recent Fellowship Reports</SectionTitle>
         <RecentList reports={fellowships} empty="No fellowship reports yet" />
@@ -57,6 +77,28 @@ function AdminGroupView() {
         <LinkButton href={`/reports?group=${group.id}`} variant="secondary" block className="mt-6">
           View all reports for this group
         </LinkButton>
+
+        {!closed && (
+          <div className="mt-8 border-t border-slate-200 pt-4">
+            {confirming ? (
+              <ConfirmCard
+                title={`Close ${group.name}?`}
+                description="The group will be hidden from the dashboard and lists. Its past reports are kept and can still be viewed."
+                confirmLabel="Close group"
+                onBack={() => setConfirming(false)}
+                onConfirm={() => {
+                  setConfirming(false);
+                  setClosedNow(true);
+                  window.scrollTo(0, 0);
+                }}
+              />
+            ) : (
+              <Button variant="danger" block onClick={() => setConfirming(true)}>
+                Close group
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

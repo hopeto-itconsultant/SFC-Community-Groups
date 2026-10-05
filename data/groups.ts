@@ -1,12 +1,11 @@
 import type { CommunityGroup } from "./types";
 
-// Frequencies other than Women's are placeholders until confirmed.
 export const groups: CommunityGroup[] = [
   {
     id: "womens-cg",
     name: "Women's",
     category: "Women",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: ["u-bokali"],
     assistantLeaderIds: [],
     photo: "/groups/womens-cg.jpg",
@@ -33,7 +32,7 @@ export const groups: CommunityGroup[] = [
     id: "business-cg",
     name: "Business",
     category: "Business",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: ["u-tianoba"],
     assistantLeaderIds: [],
     photo: "/groups/business-cg.jpg",
@@ -42,7 +41,7 @@ export const groups: CommunityGroup[] = [
     id: "arts-cg",
     name: "Arts",
     category: "Arts",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: ["u-moa"],
     assistantLeaderIds: [],
     photo: "/groups/arts-cg.jpg",
@@ -51,7 +50,7 @@ export const groups: CommunityGroup[] = [
     id: "sportz-cg",
     name: "Sportz",
     category: "Sports",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: ["u-niesakho", "u-avika"],
     assistantLeaderIds: [],
     photo: "/groups/sportz-cg.jpg",
@@ -60,7 +59,7 @@ export const groups: CommunityGroup[] = [
     id: "foodies-cg",
     name: "Foodies",
     category: "Food / Fellowship",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: ["u-shanti"],
     assistantLeaderIds: [],
     photo: "/groups/foodies-cg.jpg",
@@ -77,7 +76,7 @@ export const groups: CommunityGroup[] = [
     id: "the-collective-sound",
     name: "The Collective Sound",
     category: "Music",
-    frequency: "monthly",
+    frequency: "every-2-months",
     leaderIds: [],
     assistantLeaderIds: [],
   },

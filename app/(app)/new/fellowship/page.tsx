@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PhotoPicker, usePhotoItems, type PhotoItem } from "@/components/PhotoPicker";
 import { RoleGate } from "@/components/RoleGate";
 import { SubmittedView } from "@/components/SubmittedView";
-import { nowLocalISO, todayISO } from "@/lib/format";
+import { REPORT_BACKDATE_DAYS, daysAgoISO, nowLocalISO, todayISO } from "@/lib/format";
 import { useCurrentUser } from "@/lib/session";
 
 export default function NewFellowshipPage() {
@@ -86,6 +86,10 @@ function FellowshipForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (date < daysAgoISO(REPORT_BACKDATE_DAYS) || date > todayISO()) {
+      setError(`The fellowship date must be within the last ${REPORT_BACKDATE_DAYS} days.`);
+      return;
+    }
     const attendeeCount = toNumber(attendees);
     const firstTimerCount = toNumber(firstTimers);
     if (firstTimerCount > attendeeCount) {
@@ -116,13 +120,17 @@ function FellowshipForm({
       <PageHeader title="Fellowship Report" subtitle={group.name} backHref="/home" />
       <form onSubmit={handleSubmit} className="space-y-3 px-4 pt-4">
         <FormSection title="Date & Location">
-          <Field label="Date">
+          <Field label="Date" hint={`Within the last ${REPORT_BACKDATE_DAYS} days`}>
             <input
               type="date"
               required
               value={date}
+              min={daysAgoISO(REPORT_BACKDATE_DAYS)}
               max={todayISO()}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setError(null);
+              }}
               className={inputClass}
             />
           </Field>

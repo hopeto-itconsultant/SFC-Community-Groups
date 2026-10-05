@@ -15,8 +15,19 @@ import type {
 } from "@/data/types";
 import { todayISO } from "./format";
 
-export function getGroups(): CommunityGroup[] {
-  return [...groups].sort((a, b) => a.name.localeCompare(b.name));
+export function isGroupClosed(group: CommunityGroup): boolean {
+  return group.status === "closed";
+}
+
+/** Active groups by name; closed groups are only included when asked for. */
+export function getGroups({ includeClosed = false }: { includeClosed?: boolean } = {}): CommunityGroup[] {
+  return groups
+    .filter((g) => includeClosed || !isGroupClosed(g))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getClosedGroupCount(): number {
+  return groups.filter(isGroupClosed).length;
 }
 
 export function getGroupById(id: string | undefined): CommunityGroup | undefined {
@@ -41,12 +52,27 @@ export function getGroupAssistantLeaders(group: CommunityGroup): User[] {
     .filter((u): u is User => !!u);
 }
 
+/** Admins, plus the leaders and assistant leaders of this group. */
+export function canEditGroup(user: User, group: CommunityGroup): boolean {
+  return user.role === "admin" || user.groupId === group.id;
+}
+
+/** Same people as `canEditGroup`, and only while the plan is upcoming and not cancelled. */
+export function canEditPlan(user: User, plan: NextFellowship): boolean {
+  const group = getGroupById(plan.groupId);
+  return !!group && canEditGroup(user, group) && isUpcomingPlan(plan);
+}
+
+export function isUpcomingPlan(plan: NextFellowship): boolean {
+  return !plan.cancelledAt && plan.proposedDate >= todayISO();
+}
+
 /** The calendar date a report is about (fellowship date, follow-up date or proposed date). */
 export function getReportDate(report: Report): string {
   return report.type === "next-fellowship" ? report.proposedDate : report.date;
 }
 
-/** "this-month": filed this calendar month. "upcoming": next-fellowship plans dated today or later. */
+/** "this-month": filed this calendar month. "upcoming": uncancelled next-fellowship plans dated today or later. */
 export type ReportPeriod = "this-month" | "upcoming";
 
 export interface ReportQuery {
@@ -62,12 +88,11 @@ function hasExpense(report: Report): report is FellowshipReport {
 }
 
 function inPeriod(report: Report, period: ReportPeriod | undefined): boolean {
-  const today = todayISO();
   switch (period) {
     case "this-month":
-      return report.createdAt.startsWith(today.slice(0, 7));
+      return report.createdAt.startsWith(todayISO().slice(0, 7));
     case "upcoming":
-      return report.type === "next-fellowship" && report.proposedDate >= today;
+      return report.type === "next-fellowship" && isUpcomingPlan(report);
     default:
       return true;
   }

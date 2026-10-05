@@ -16,12 +16,20 @@ Open http://localhost:3000. To try it on a phone on the same Wi-Fi, run `npm run
 
 Pick any user on the login screen: Admin, every group leader, and a "Demo Asst. Leader" for Women's.
 
+## Prototype rules
+
+- **Meeting frequency:** Men's meets monthly; every other group meets every 2 months. Fixed in `data/groups.ts` for now; Admin will be able to change it in the live version.
+- **Fellowship reports:** up to 3 photos, and the fellowship date must be within the last 7 days.
+- **Groups:** Admin can add a group, and can close a group instead of deleting it (its past reports are kept). Admin and the group's leaders can edit the group's profile and photo.
+- **Next fellowship plans:** Admin and the group's leaders can edit or cancel an upcoming plan from its detail page.
+- None of these changes are saved: each screen shows the result with a "Prototype: not saved" note.
+
 ## Where things live
 
 - `data/` – mock data (`groups.ts`, `users.ts`, `reports.ts`) and types (`types.ts`)
 - `lib/data-access.ts` – the only place screens read data from; replace with Supabase queries later
 - `components/PhotoPicker.tsx` – photo selection/preview; swap in Supabase Storage upload later
-- `app/(app)/` – signed-in screens (Home, My Group, Groups, Reports, New Report forms, More)
+- `app/(app)/` – signed-in screens (Home, My Group, Groups, Reports, New Report forms, More), plus Add Group (`groups/new`), Edit Group (`groups/[id]/edit`) and Edit Plan (`reports/[id]/edit`)
 
 ## Your assets
 

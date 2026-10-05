@@ -63,6 +63,7 @@ function CardSummary({ report }: { report: Report }) {
 }
 
 export function UpcomingBadge({ report }: { report: NextFellowship }) {
+  if (report.cancelledAt) return <Badge tone="amber">Cancelled</Badge>;
   return report.proposedDate >= todayISO() ? (
     <Badge tone="green">Upcoming</Badge>
   ) : (
@@ -304,6 +305,7 @@ function NextFellowshipDetail({ report }: { report: NextFellowship }) {
       <InfoRow label="Location">{report.location}</InfoRow>
       <TextBlock label="Activity & Discussion">{report.activity}</TextBlock>
       <TextBlock label="Goals">{report.goals}</TextBlock>
+      {report.cancelledAt && <InfoRow label="Cancelled">{formatDate(report.cancelledAt)}</InfoRow>}
     </>
   );
 }

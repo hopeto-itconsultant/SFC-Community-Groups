@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "danger-solid";
 
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100";
@@ -10,6 +10,8 @@ const VARIANTS: Record<Variant, string> = {
   primary: "bg-brand-700 text-white shadow-sm hover:bg-brand-800",
   secondary: "bg-white text-brand-700 ring-1 ring-inset ring-brand-200 hover:bg-brand-50",
   ghost: "text-brand-700 hover:bg-brand-50",
+  danger: "bg-white text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50",
+  "danger-solid": "bg-red-700 text-white shadow-sm hover:bg-red-800",
 };
 
 const SIZES = {
@@ -92,6 +94,36 @@ export function InfoRow({ label, children }: { label: string; children: ReactNod
     <div className="py-2">
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-base text-slate-900">{children}</dd>
+    </div>
+  );
+}
+
+/** Inline "are you sure?" step for destructive actions such as closing a group or cancelling a plan. */
+export function ConfirmCard({
+  title,
+  description,
+  confirmLabel,
+  onConfirm,
+  onBack,
+}: {
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div role="alertdialog" aria-label={title} className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+      <p className="font-bold text-red-800">{title}</p>
+      {description && <p className="mt-1 text-sm text-red-700">{description}</p>}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={onBack}>
+          Back
+        </Button>
+        <Button variant="danger-solid" onClick={onConfirm}>
+          {confirmLabel}
+        </Button>
+      </div>
     </div>
   );
 }

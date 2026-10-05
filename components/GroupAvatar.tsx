@@ -30,6 +30,11 @@ function colorFor(id: string): string {
   return PALETTE[hash % PALETTE.length];
 }
 
+/** Photos picked on the device (prototype edits) are blob: URLs that next/image can't optimise. */
+export function isLocalPreview(src: string): boolean {
+  return src.startsWith("blob:");
+}
+
 const SIZES = {
   sm: "h-10 w-10 text-sm",
   md: "h-12 w-12 text-base",
@@ -46,7 +51,14 @@ export function GroupAvatar({
   if (group.photo) {
     return (
       <div className={`relative shrink-0 overflow-hidden rounded-xl ${SIZES[size]}`}>
-        <Image src={group.photo} alt={group.name} fill sizes="64px" className="object-cover" />
+        <Image
+          src={group.photo}
+          alt={group.name}
+          fill
+          sizes="64px"
+          className="object-cover"
+          unoptimized={isLocalPreview(group.photo)}
+        />
       </div>
     );
   }

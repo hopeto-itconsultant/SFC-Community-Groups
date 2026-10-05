@@ -26,6 +26,9 @@ function MyGroup() {
       <PageHeader title="My Group" />
       <div className="p-4">
         <GroupProfile group={group} />
+        <LinkButton href={`/groups/${group.id}/edit`} variant="secondary" block className="mt-3">
+          Edit group profile
+        </LinkButton>
 
         <SectionTitle>Next Fellowship</SectionTitle>
         {next ? (

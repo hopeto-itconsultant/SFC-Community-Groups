@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CameraIcon, XIcon } from "./icons";
 
-export const MAX_PHOTOS = 5;
+export const MAX_PHOTOS = 3;
 
 /**
  * A photo selected on the device. In production `file` would be compressed
@@ -64,7 +64,7 @@ export function PhotoPicker({
     const skipped = files.length - accepted.length;
     setNotice(
       skipped > 0
-        ? `Maximum ${max} photos per report. ${skipped} photo${skipped === 1 ? " was" : "s were"} not added.`
+        ? `Maximum ${max} photo${max === 1 ? "" : "s"}. ${skipped} photo${skipped === 1 ? " was" : "s were"} not added.`
         : null,
     );
     onChange([...value, ...accepted.map(toPhotoItem)]);
@@ -120,7 +120,7 @@ export function PhotoPicker({
         className="hidden"
       />
       <p className="mt-2 text-xs text-slate-500">
-        {value.length} of {max} photos. Prototype: photos stay on this device and are not uploaded.
+        {value.length} of {max} photo{max === 1 ? "" : "s"}. Prototype: photos stay on this device and are not uploaded.
       </p>
       {notice && (
         <p role="status" className="mt-1 text-sm font-medium text-amber-700">
