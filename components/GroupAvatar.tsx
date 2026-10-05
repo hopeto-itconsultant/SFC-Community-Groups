@@ -17,7 +17,7 @@ function initials(name: string): string {
   const words = name
     .replace(/'s\b/g, "")
     .split(/\s+/)
-    .filter((w) => !["the", "cg"].includes(w.toLowerCase()));
+    .filter((w) => /^[a-z]/i.test(w) && !["the", "cg"].includes(w.toLowerCase()));
   return words
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())

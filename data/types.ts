@@ -22,7 +22,7 @@ export interface User extends Person {
 export interface CommunityGroup {
   id: string;
   name: string;
-  category: string;
+  category?: string;
   frequency: Frequency;
   leaderIds: string[];
   assistantLeaderIds: string[];

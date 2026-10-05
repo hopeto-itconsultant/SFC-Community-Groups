@@ -24,6 +24,19 @@ body {
   @apply bg-slate-100 text-slate-900 antialiased;
 }
 
+/* Tailwind v4 resets buttons to the default arrow cursor. */
+@layer base {
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  select,
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+}
+
 /* 16px minimum prevents iOS from zooming into focused inputs. */
 input,
 select,

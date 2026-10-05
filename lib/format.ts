@@ -14,6 +14,12 @@ export function formatDate(iso: string): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/** "2026-09-28" -> "28 Sep" */
+export function formatShortDate(iso: string): string {
+  const date = parseLocalDate(iso);
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
 export function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");

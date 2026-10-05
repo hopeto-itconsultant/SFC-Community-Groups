@@ -14,7 +14,7 @@ Open http://localhost:3000. To try it on a phone on the same Wi-Fi, run `npm run
 
 ## Demo users
 
-Pick any user on the login screen: Admin, every group leader, and a "Demo Asst. Leader" for Women's CG.
+Pick any user on the login screen: Admin, every group leader, and a "Demo Asst. Leader" for Women's.
 
 ## Where things live
 

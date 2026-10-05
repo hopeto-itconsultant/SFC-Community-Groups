@@ -1,15 +1,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { FellowshipReport, FollowUpReport, NextFellowship, Report } from "@/data/types";
-import { getGroupById, getUserById } from "@/lib/data-access";
+import type {
+  FellowshipReport,
+  FollowUpReport,
+  NextFellowship,
+  Report,
+  ReportType,
+} from "@/data/types";
+import { type ReportTypeSummaries, getGroupById, getUserById } from "@/lib/data-access";
 import {
+  CONTACT_MODES,
   NOT_AVAILABLE,
   REPORT_TYPE_EMOJI,
   REPORT_TYPE_LABELS,
   contactModeLabel,
   formatDate,
   formatRupees,
+  formatShortDate,
   todayISO,
 } from "@/lib/format";
 import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
@@ -91,6 +99,133 @@ export function ReportCard({ report }: { report: Report }) {
         </span>
       </div>
     </Link>
+  );
+}
+
+/** List item for the expenditures view: the amount and what it was spent on. */
+export function ExpenseCard({ report }: { report: FellowshipReport }) {
+  const group = getGroupById(report.groupId);
+  return (
+    <Link
+      href={`/reports/${report.id}`}
+      className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-lg font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
+          <p className="truncate text-sm font-medium text-brand-700">{group?.name}</p>
+        </div>
+        <p className="shrink-0 text-sm text-slate-500">{formatDate(report.date)}</p>
+      </div>
+      {report.expenseDetails && (
+        <p className="mt-2 line-clamp-2 text-sm text-slate-600">{report.expenseDetails}</p>
+      )}
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
+        <p className="min-w-0 truncate text-slate-500">
+          Filed by <span className="font-medium text-slate-700">{filedByName(report)}</span>
+        </p>
+        <span className="flex shrink-0 items-center font-semibold text-brand-700">
+          View <ChevronRightIcon width={18} height={18} />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/** Dense row for the all-groups fellowship listing. */
+export function FellowshipListRow({ report }: { report: FellowshipReport }) {
+  const group = getGroupById(report.groupId);
+  return (
+    <Link
+      href={`/reports/${report.id}`}
+      className="flex items-center gap-2 px-3 py-2.5 active:bg-slate-50"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <p className="shrink-0 text-sm font-bold">{formatShortDate(report.date)}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+          <p className="shrink-0 text-sm">
+            <span className="font-bold">{report.attendees}</span>
+            {report.firstTimers > 0 && (
+              <span className="ml-1 text-xs font-semibold text-emerald-700">+{report.firstTimers} new</span>
+            )}
+          </p>
+        </div>
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+          <MapPinIcon width={14} height={14} className="shrink-0 text-slate-400" />
+          <span className="min-w-0 truncate">{report.location}</span>
+          {!!report.expenseAmount && (
+            <span className="shrink-0"> · {formatRupees(report.expenseAmount)}</span>
+          )}
+          {report.photos.length > 0 && (
+            <span className="shrink-0"> · {plural(report.photos.length, "photo")}</span>
+          )}
+        </div>
+        {report.summary && <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">{report.summary}</p>}
+      </div>
+      <ChevronRightIcon width={18} height={18} className="shrink-0 text-brand-700" />
+    </Link>
+  );
+}
+
+const FOLLOW_UP_COLS =
+  "grid grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-2";
+
+function ModeCell({ mode }: { mode: FollowUpReport["mode"] }) {
+  const m = CONTACT_MODES.find((c) => c.value === mode);
+  if (!m) return <>{mode}</>;
+  return (
+    <>
+      <span aria-hidden="true">{m.emoji}</span>
+      <span className="sr-only sm:not-sr-only sm:ml-1">{m.label}</span>
+    </>
+  );
+}
+
+/** Column-aligned table of follow-ups for the all-groups view. */
+export function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
+  return (
+    <div
+      role="table"
+      aria-label="Follow-ups"
+      className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70"
+    >
+      <div
+        role="row"
+        className={`${FOLLOW_UP_COLS} bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500`}
+      >
+        <span role="columnheader">Date</span>
+        <span role="columnheader">Person</span>
+        <span role="columnheader">Group</span>
+        <span role="columnheader">Mode</span>
+      </div>
+      {reports.map((r) => (
+        <Link
+          key={r.id}
+          href={`/reports/${r.id}`}
+          role="row"
+          className={`${FOLLOW_UP_COLS} px-3 py-2 text-sm active:bg-slate-50`}
+        >
+          <span role="cell" className="font-bold">
+            {formatShortDate(r.date)}
+          </span>
+          <span role="cell" className="truncate font-medium">
+            {r.personName}
+          </span>
+          <span role="cell" className="truncate text-brand-700">
+            {getGroupById(r.groupId)?.name}
+          </span>
+          <span role="cell" className="whitespace-nowrap text-slate-600">
+            <ModeCell mode={r.mode} />
+          </span>
+          {r.comments && (
+            <span role="cell" className="col-span-3 col-start-2 line-clamp-1 text-xs text-slate-500">
+              {r.comments}
+            </span>
+          )}
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -217,6 +352,155 @@ export function NextFellowshipSummary({ report }: { report: NextFellowship }) {
         <span className="truncate">{report.location}</span>
       </div>
       <p className="mt-2 line-clamp-2 text-slate-700">{report.activity}</p>
+    </Link>
+  );
+}
+
+function StatTile({ value, label }: { value: ReactNode; label: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-1.5">
+      <p className="truncate text-lg font-bold leading-tight">{value}</p>
+      <p className="truncate text-[11px] font-medium text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function EmptyNote({ children }: { children: ReactNode }) {
+  return <p className="rounded-lg bg-slate-50 px-2 py-2.5 text-sm text-slate-500">{children}</p>;
+}
+
+function FellowshipTypeBody({ summary }: { summary: ReportTypeSummaries["fellowship"] }) {
+  if (!summary.total) return <EmptyNote>No reports yet</EmptyNote>;
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <StatTile value={summary.thisMonth} label="This month" />
+      <StatTile value={summary.avgAttendance} label="Avg. attendance" />
+      <StatTile value={summary.totalFirstTimers} label="First-timers" />
+    </div>
+  );
+}
+
+function FollowUpTypeBody({ summary }: { summary: ReportTypeSummaries["followUp"] }) {
+  if (!summary.total) return <EmptyNote>No reports yet</EmptyNote>;
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      <StatTile value={summary.thisMonth} label="This month" />
+      {CONTACT_MODES.map((m) => (
+        <StatTile key={m.value} value={summary.byMode[m.value]} label={`${m.emoji} ${m.label}`} />
+      ))}
+    </div>
+  );
+}
+
+function NextFellowshipTypeBody({ summary }: { summary: ReportTypeSummaries["nextFellowship"] }) {
+  const { next } = summary;
+  if (!next) return <EmptyNote>No upcoming fellowship planned</EmptyNote>;
+  return (
+    <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-sm">
+      <div className="flex items-center gap-1.5 font-bold">
+        <CalendarIcon width={16} height={16} className="shrink-0 text-brand-700" />
+        {formatDate(next.proposedDate)}
+      </div>
+      <div className="flex items-center gap-1.5 text-slate-600">
+        <MapPinIcon width={16} height={16} className="shrink-0 text-slate-400" />
+        <span className="truncate">{next.location}</span>
+      </div>
+    </div>
+  );
+}
+
+function ExpenditureTypeBody({ summary }: { summary: ReportTypeSummaries["expenditure"] }) {
+  if (!summary.count) return <EmptyNote>No expenses recorded yet</EmptyNote>;
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <StatTile value={formatRupees(summary.thisMonthAmount)} label="This month" />
+      <StatTile value={formatRupees(summary.totalAmount)} label="Total spent" />
+      <StatTile value={formatRupees(summary.avgAmount)} label="Avg. per fellowship" />
+    </div>
+  );
+}
+
+function withLastDate(total: number, word: string, lastDate: string | undefined) {
+  const count = plural(total, word);
+  return lastDate ? `${count} · Last ${formatShortDate(lastDate)}` : count;
+}
+
+/** Report types plus the expenditure view, which is derived from fellowship reports. */
+export type ReportCardKind = ReportType | "expenditure";
+
+export const CARD_LABELS: Record<ReportCardKind, string> = {
+  fellowship: "CG Meets",
+  "follow-up": "Follow-ups",
+  "next-fellowship": REPORT_TYPE_LABELS["next-fellowship"],
+  expenditure: "Expenditures",
+};
+
+const CARD_EMOJI: Record<ReportCardKind, string> = {
+  ...REPORT_TYPE_EMOJI,
+  expenditure: "💰",
+};
+
+function typeCardMeta(kind: ReportCardKind, summaries: ReportTypeSummaries) {
+  switch (kind) {
+    case "expenditure": {
+      const { count, lastDate } = summaries.expenditure;
+      return {
+        subtitle: withLastDate(count, "expense", lastDate),
+        body: <ExpenditureTypeBody summary={summaries.expenditure} />,
+      };
+    }
+    case "fellowship": {
+      const { total, lastDate } = summaries.fellowship;
+      return {
+        subtitle: withLastDate(total, "report", lastDate),
+        body: <FellowshipTypeBody summary={summaries.fellowship} />,
+      };
+    }
+    case "follow-up": {
+      const { total, lastDate } = summaries.followUp;
+      return {
+        subtitle: withLastDate(total, "report", lastDate),
+        body: <FollowUpTypeBody summary={summaries.followUp} />,
+      };
+    }
+    case "next-fellowship":
+      return {
+        subtitle: `${summaries.nextFellowship.upcomingCount} upcoming`,
+        body: <NextFellowshipTypeBody summary={summaries.nextFellowship} />,
+      };
+  }
+}
+
+/** Overview card for one report type on the Reports screen. */
+export function ReportTypeCard({
+  kind,
+  summaries,
+  href,
+}: {
+  kind: ReportCardKind;
+  summaries: ReportTypeSummaries;
+  href: string;
+}) {
+  const { subtitle, body } = typeCardMeta(kind, summaries);
+  return (
+    <Link
+      href={href}
+      className="block rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+    >
+      <div className="flex items-center gap-2.5">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-lg"
+          aria-hidden="true"
+        >
+          {CARD_EMOJI[kind]}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-bold leading-tight">{CARD_LABELS[kind]}</p>
+          <p className="truncate text-xs text-slate-500">{subtitle}</p>
+        </div>
+        <ChevronRightIcon width={20} height={20} className="shrink-0 text-brand-700" />
+      </div>
+      <div className="mt-2">{body}</div>
     </Link>
   );
 }
