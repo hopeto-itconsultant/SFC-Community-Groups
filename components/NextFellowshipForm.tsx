@@ -75,9 +75,10 @@ export function NextFellowshipForm({
             className={inputClass}
           />
         </Field>
-        <Field label="Goals" optional>
+        <Field label="Goals">
           <textarea
             rows={3}
+            required
             value={goals}
             onChange={(e) => setGoals(e.target.value)}
             className={inputClass}
