@@ -66,7 +66,7 @@ export const groups: CommunityGroup[] = [
   },
   {
     id: "kings-messengers",
-    name: "Kings Messengers",
+    name: "King's Messengers",
     category: "Bikers",
     frequency: "every-2-months",
     leaderIds: ["u-arthur"],
