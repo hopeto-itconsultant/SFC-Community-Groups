@@ -7,8 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import readline from "node:readline/promises";
 import { Writable } from "node:stream";
 import { loginEmailForMobile, normalizeMobile } from "../lib/login-id.ts";
-
-const MIN_PASSWORD_LENGTH = 8;
+import { MIN_PASSWORD_LENGTH, passwordProblem } from "../lib/passwords.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -63,7 +62,8 @@ const password = await askPassword(`Password (at least ${MIN_PASSWORD_LENGTH} ch
 const confirmation = await askPassword("Confirm password: ");
 rl.close();
 
-if (password.length < MIN_PASSWORD_LENGTH) fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+const problem = passwordProblem(password);
+if (problem) fail(problem);
 if (password !== confirmation) fail("Passwords do not match.");
 
 const { data: created, error: createError } = await supabase.auth.admin.createUser({
