@@ -6,7 +6,7 @@
 import { createClient } from "@supabase/supabase-js";
 import readline from "node:readline/promises";
 import { Writable } from "node:stream";
-import { MOBILE_PATTERN, loginEmailForMobile, normalizeMobile } from "../lib/login-id.ts";
+import { loginEmailForMobile, normalizeMobile } from "../lib/login-id.ts";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -20,7 +20,11 @@ if (!url || !secretKey) {
 
 const supabase = createClient(url, secretKey, { auth: { persistSession: false } });
 
+let rl;
+
 function fail(message) {
+  // Exiting with the prompt still open crashes Node on Windows.
+  rl?.close();
   console.error(message);
   process.exit(1);
 }
@@ -39,7 +43,7 @@ const output = new Writable({
     callback();
   },
 });
-const rl = readline.createInterface({ input: process.stdin, output, terminal: true });
+rl = readline.createInterface({ input: process.stdin, output, terminal: true });
 
 async function askPassword(prompt) {
   process.stdout.write(prompt);
@@ -52,13 +56,13 @@ async function askPassword(prompt) {
 
 console.log(`Creating the first Admin for ${url}`);
 const name = (await rl.question("Full name: ")).trim();
-const mobile = normalizeMobile(await rl.question("Mobile number with country code (e.g. +919876543210): "));
+if (!name) fail("Name is required.");
+const mobile = normalizeMobile(await rl.question("Mobile number (e.g. 9876543210 or 919876543210): "));
+if (!mobile) fail("Enter a mobile number: 10 digits, or the country code followed by the number.");
 const password = await askPassword(`Password (at least ${MIN_PASSWORD_LENGTH} characters): `);
 const confirmation = await askPassword("Confirm password: ");
 rl.close();
 
-if (!name) fail("Name is required.");
-if (!MOBILE_PATTERN.test(mobile)) fail("Mobile number must start with + and the country code, e.g. +919876543210.");
 if (password.length < MIN_PASSWORD_LENGTH) fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
 if (password !== confirmation) fail("Passwords do not match.");
 
