@@ -1,4 +1,15 @@
+import { cache } from "react";
 import type { ContactMode, Frequency, ReportType, Role } from "@/data/types";
+
+declare global {
+  interface Window {
+    /** Calendar day this response was rendered with. Set before hydration so dates match. */
+    __SFC_TODAY__?: string;
+  }
+}
+
+/** One clock per server request, so every "today" on the page is the same string. */
+const requestNowMs = cache(() => Date.now());
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -28,24 +39,32 @@ export function toISODate(date: Date): string {
 }
 
 export function todayISO(): string {
-  return toISODate(new Date());
+  if (typeof window !== "undefined" && window.__SFC_TODAY__) return window.__SFC_TODAY__;
+  const now = new Date(typeof window === "undefined" ? requestNowMs() : Date.now());
+  return toISODate(now);
 }
 
 /** How far back a fellowship report can be dated. */
 export const REPORT_BACKDATE_DAYS = 7;
 
-/** Local calendar date `days` days before today. */
-export function daysAgoISO(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return toISODate(date);
+function shiftISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
-/** Local calendar date of this coming Sunday (today if it is Sunday). */
+/** Calendar date `days` days before today. */
+export function daysAgoISO(days: number): string {
+  return shiftISO(todayISO(), -days);
+}
+
+/** Calendar date of this coming Sunday (today if it is Sunday). */
 export function endOfWeekISO(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + ((7 - date.getDay()) % 7));
-  return toISODate(date);
+  const today = todayISO();
+  const [y, m, d] = today.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return shiftISO(today, (7 - dow) % 7);
 }
 
 /** Local date-time without timezone, e.g. "2026-10-05T17:30:00". */

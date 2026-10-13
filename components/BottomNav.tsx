@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType, SVGProps } from "react";
+import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import type { Role } from "@/data/types";
+import { isConstrainedNetwork } from "@/lib/network";
 import { FileTextIcon, GridIcon, HomeIcon, MenuIcon, UsersIcon } from "./icons";
 
 interface NavItem {
@@ -35,11 +36,18 @@ function matches(pathname: string, prefix: string) {
 export function BottomNav({ role }: { role: Role }) {
   const pathname = usePathname();
   const items = role === "admin" ? ADMIN_NAV : LEADER_NAV;
+  const [prefetch, setPrefetch] = useState(false);
+
+  useEffect(() => {
+    if (isConstrainedNetwork()) return;
+    const id = window.setTimeout(() => setPrefetch(true), 1200);
+    return () => window.clearTimeout(id);
+  }, []);
 
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto grid max-w-xl grid-cols-4">
         {items.map(({ href, label, icon: Icon, also = [] }) => {
@@ -48,6 +56,7 @@ export function BottomNav({ role }: { role: Role }) {
             <li key={href}>
               <Link
                 href={href}
+                prefetch={prefetch ? null : false}
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold ${
                   active ? "text-brand-700" : "text-slate-500"

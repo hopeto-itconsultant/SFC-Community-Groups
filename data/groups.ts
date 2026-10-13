@@ -8,7 +8,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-loyilo"],
     assistantLeaderIds: ["u-nzano", "u-boholi"],
-    photo: "/groups/womens-cg.jpg",
+    photo: "/groups/womens-cg.webp",
   },
   {
     id: "mens-cg",
@@ -17,7 +17,7 @@ export const groups: CommunityGroup[] = [
     frequency: "monthly",
     leaderIds: ["u-robin"],
     assistantLeaderIds: ["u-beizo", "u-bishwajit"],
-    photo: "/groups/mens-cg.jpg",
+    photo: "/groups/mens-cg.webp",
   },
   {
     id: "the-gathering",
@@ -26,7 +26,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-tuhovi", "u-luxmi"],
     assistantLeaderIds: [],
-    photo: "/groups/the-gathering.jpg",
+    photo: "/groups/the-gathering.webp",
   },
   {
     id: "business-cg",
@@ -35,7 +35,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-tianoba"],
     assistantLeaderIds: ["u-toito", "u-nubuzo", "u-noken", "u-jenti", "u-kaidin"],
-    photo: "/groups/business-cg.jpg",
+    photo: "/groups/business-cg.webp",
   },
   {
     id: "arts-cg",
@@ -44,7 +44,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-moa"],
     assistantLeaderIds: ["u-rebekah", "u-naro"],
-    photo: "/groups/arts-cg.jpg",
+    photo: "/groups/arts-cg.webp",
   },
   {
     id: "sportz-cg",
@@ -53,7 +53,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-niesakho", "u-ivika"],
     assistantLeaderIds: ["u-vir", "u-pete"],
-    photo: "/groups/sportz-cg.jpg",
+    photo: "/groups/sportz-cg.webp",
   },
   {
     id: "foodies-cg",
@@ -62,7 +62,7 @@ export const groups: CommunityGroup[] = [
     frequency: "every-2-months",
     leaderIds: ["u-shanti"],
     assistantLeaderIds: ["u-reshmi", "u-nzanbeni"],
-    photo: "/groups/foodies-cg.jpg",
+    photo: "/groups/foodies-cg.webp",
   },
   {
     id: "kings-messengers",

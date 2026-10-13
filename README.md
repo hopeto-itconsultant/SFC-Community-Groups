@@ -33,6 +33,6 @@ Pick any user on the login screen: Admin, every group leader, and every assistan
 
 ## Your assets
 
-- **Logo:** replace `public/brand/logo.jpg` (or change `LOGO_SRC` in `lib/brand.ts`).
-- **Group photos:** put files in `public/groups/` named by group id (e.g. `womens-cg.jpg`) and set `photo: "/groups/womens-cg.jpg"` on the group in `data/groups.ts`. Groups without a photo show initials.
-- **HEIC photos (iPhone):** drop `.heic` files into `public/groups/` and run `npm run images`. They are converted to resized JPGs (most browsers can't show HEIC) and the originals are moved to `assets-source/groups/`.
+- **Logo:** replace `public/brand/logo.webp` (or change `LOGO_SRC` in `lib/brand.ts`).
+- **Group photos:** put files in `public/groups/` named by group id (e.g. `womens-cg.webp`) and set `photo: "/groups/womens-cg.webp"` on the group in `data/groups.ts`. Avatars use the matching file in `public/groups/thumbs/`. Groups without a photo show initials.
+- **HEIC photos (iPhone):** drop `.heic` files into `public/groups/` and run `npm run images`. They are converted to a resized WebP plus a small avatar, and the originals are moved to `assets-source/groups/`.

@@ -28,7 +28,7 @@ export interface CommunityGroup {
   frequency: Frequency;
   leaderIds: string[];
   assistantLeaderIds: string[];
-  /** Path under /public, e.g. "/groups/womens-cg.jpg". */
+  /** Path under /public, e.g. "/groups/womens-cg.webp". */
   photo?: string;
   /** Closed groups are kept, with their reports, instead of being deleted. Missing means active. */
   status?: GroupStatus;

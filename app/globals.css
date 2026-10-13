@@ -34,6 +34,7 @@ body {
   summary,
   label[for] {
     cursor: pointer;
+    touch-action: manipulation;
   }
 }
 
@@ -49,4 +50,17 @@ textarea {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Skip layout work for list rows that are off screen. */
+.cv-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 11rem;
+}
+
+/* Safari 15–16.3 draws a gray border on lazy images. */
+@supports (font: -apple-system-body) and (-webkit-appearance: none) {
+  img[loading="lazy"] {
+    clip-path: inset(0.6px);
+  }
 }

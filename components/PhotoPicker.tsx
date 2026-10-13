@@ -7,9 +7,9 @@ import { CameraIcon, XIcon } from "./icons";
 export const MAX_PHOTOS = 3;
 
 /**
- * A photo selected on the device. In production `file` would be compressed
- * (~300-500 KB) and uploaded to Supabase Storage on submit; the UI only
- * depends on `previewUrl`.
+ * A photo selected on the device. Camera photos are downscaled before preview.
+ * In production `file` would be uploaded to Supabase Storage on submit; the UI
+ * only depends on `previewUrl`.
  */
 export interface PhotoItem {
   id: string;
@@ -18,6 +18,42 @@ export interface PhotoItem {
 }
 
 let nextId = 0;
+
+const MAX_EDGE = 1600;
+const MAX_BYTES = 450 * 1024;
+
+/** Downscale camera photos before preview so a phone doesn't decode a multi-megabyte image. */
+async function compressPhoto(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  if (typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const longest = Math.max(bitmap.width, bitmap.height);
+    if (file.size <= MAX_BYTES && longest <= MAX_EDGE) {
+      bitmap.close();
+      return file;
+    }
+    const scale = Math.min(1, MAX_EDGE / longest);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    if (!blob || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.\w+$/, "") || "photo";
+    return new File([blob], `${name}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  } catch {
+    return file;
+  }
+}
 
 function toPhotoItem(file: File): PhotoItem {
   nextId += 1;
@@ -56,7 +92,7 @@ export function PhotoPicker({
   const [notice, setNotice] = useState<string | null>(null);
   const remaining = max - value.length;
 
-  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
     e.target.value = "";
     if (!files.length) return;
@@ -67,7 +103,8 @@ export function PhotoPicker({
         ? `Maximum ${max} photo${max === 1 ? "" : "s"}. ${skipped} photo${skipped === 1 ? " was" : "s were"} not added.`
         : null,
     );
-    onChange([...value, ...accepted.map(toPhotoItem)]);
+    const compressed = await Promise.all(accepted.map(compressPhoto));
+    onChange([...value, ...compressed.map(toPhotoItem)]);
   }
 
   function remove(id: string) {

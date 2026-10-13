@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { GridIcon, ListIcon } from "./icons";
 
 export type GroupView = "cards" | "list";
@@ -10,16 +10,31 @@ const VIEW_OPTIONS = [
   { value: "list", label: "List view", icon: ListIcon },
 ] as const;
 
+function subscribeView(storageKey: string, listener: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === storageKey || event.key === null) listener();
+  };
+  const name = `sfc-view:${storageKey}`;
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(name, listener);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(name, listener);
+  };
+}
+
 /** Cards/List preference persisted in localStorage under `storageKey`; defaults to cards. */
 export function useStoredView(storageKey: string): [GroupView, (view: GroupView) => void] {
-  const [view, setViewState] = useState<GroupView>(() =>
-    window.localStorage.getItem(storageKey) === "list" ? "list" : "cards",
+  const view = useSyncExternalStore(
+    (listener) => subscribeView(storageKey, listener),
+    () => (window.localStorage.getItem(storageKey) === "list" ? "list" : "cards"),
+    () => "cards" as const,
   );
 
-  const setView = (next: GroupView) => {
-    setViewState(next);
+  const setView = useCallback((next: GroupView) => {
     window.localStorage.setItem(storageKey, next);
-  };
+    window.dispatchEvent(new Event(`sfc-view:${storageKey}`));
+  }, [storageKey]);
 
   return [view, setView];
 }

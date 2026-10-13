@@ -2,18 +2,18 @@
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 import type { CommunityGroup, User } from "@/data/types";
+import { toISODate } from "./format";
 import { getGroupById, getUserById } from "./data-access";
-
-const STORAGE_KEY = "sfc-demo-user";
+import { userCookieAssignment, userIdFromCookieHeader } from "./user-cookie";
 
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  window.addEventListener("storage", listener);
+  window.addEventListener("focus", listener);
   return () => {
     listeners.delete(listener);
-    window.removeEventListener("storage", listener);
+    window.removeEventListener("focus", listener);
   };
 }
 
@@ -21,17 +21,28 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
-function getSnapshot(): string | null {
-  return window.sessionStorage.getItem(STORAGE_KEY);
+function readUserId(): string | null {
+  return userIdFromCookieHeader(document.cookie);
 }
 
-/** `undefined` on the server and during hydration means "not known yet". */
-function getServerSnapshot(): string | null | undefined {
-  return undefined;
+function writeUserCookie(id: string | null) {
+  const secure = window.location.protocol === "https:";
+  document.cookie = userCookieAssignment(id, secure);
+}
+
+function subscribeToday() {
+  return () => {};
+}
+
+/** Phone-local calendar day. Runs only after hydration, then date-based UI can catch up. */
+function readLocalToday(): string {
+  const local = toISODate(new Date());
+  window.__SFC_TODAY__ = local;
+  return local;
 }
 
 interface SessionValue {
-  /** False until the stored demo user has been read on the client. */
+  /** False only before the signed-in user is known. With a server-rendered cookie this is immediate. */
   ready: boolean;
   user: User | undefined;
   group: CommunityGroup | undefined;
@@ -41,29 +52,43 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const userId = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+export function SessionProvider({
+  initialUserId,
+  initialToday,
+  children,
+}: {
+  initialUserId: string | null;
+  /** Calendar day used to render this response. Kept for hydration, then corrected to the phone's day. */
+  initialToday: string;
+  children: React.ReactNode;
+}) {
+  if (typeof window !== "undefined") window.__SFC_TODAY__ ??= initialToday;
+
+  const userId = useSyncExternalStore(subscribe, readUserId, () => initialUserId);
+  const today = useSyncExternalStore(subscribeToday, readLocalToday, () => initialToday);
 
   const login = useCallback((id: string) => {
-    window.sessionStorage.setItem(STORAGE_KEY, id);
+    writeUserCookie(id);
     notify();
   }, []);
 
   const logout = useCallback(() => {
-    window.sessionStorage.removeItem(STORAGE_KEY);
+    writeUserCookie(null);
     notify();
   }, []);
 
   const value = useMemo<SessionValue>(() => {
+    // `today` invalidates this value when the phone's calendar day replaces the server day.
+    void today;
     const user = getUserById(userId ?? undefined);
     return {
-      ready: userId !== undefined,
+      ready: true,
       user,
       group: getGroupById(user?.groupId),
       login,
       logout,
     };
-  }, [userId, login, logout]);
+  }, [userId, login, logout, today]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

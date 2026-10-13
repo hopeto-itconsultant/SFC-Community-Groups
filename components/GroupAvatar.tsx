@@ -35,10 +35,23 @@ export function isLocalPreview(src: string): boolean {
   return src.startsWith("blob:");
 }
 
+/** Already-small avatar file, so list screens don't download the full group photo. */
+export function groupThumbSrc(photo: string): string {
+  if (isLocalPreview(photo)) return photo;
+  const slash = photo.lastIndexOf("/");
+  return `${photo.slice(0, slash)}/thumbs${photo.slice(slash)}`;
+}
+
 const SIZES = {
   sm: "h-10 w-10 text-sm",
   md: "h-12 w-12 text-base",
   lg: "h-16 w-16 text-xl",
+};
+
+const SIZE_PX = {
+  sm: "40px",
+  md: "48px",
+  lg: "64px",
 };
 
 export function GroupAvatar({
@@ -52,12 +65,12 @@ export function GroupAvatar({
     return (
       <div className={`relative shrink-0 overflow-hidden rounded-xl ${SIZES[size]}`}>
         <Image
-          src={group.photo}
+          src={groupThumbSrc(group.photo)}
           alt={group.name}
           fill
-          sizes="64px"
+          sizes={SIZE_PX[size]}
           className="object-cover"
-          unoptimized={isLocalPreview(group.photo)}
+          unoptimized
         />
       </div>
     );
