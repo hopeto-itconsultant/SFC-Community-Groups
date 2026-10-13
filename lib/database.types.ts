@@ -242,6 +242,7 @@ export type Database = {
       current_profile_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_group_member: { Args: { group_id: string }; Returns: boolean }
+      report_type_summaries: { Args: { p_group_id?: string }; Returns: Json }
       storage_group_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
