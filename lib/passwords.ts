@@ -9,7 +9,7 @@ export function passwordProblem(password: string): string | null {
 }
 
 // Short, everyday words that are easy to spell and to read out over the phone.
-// 4 to 6 letters each, so generated passwords are 7 to 9 characters.
+// 4 to 6 letters each, so generated passwords are 8 to 10 characters.
 const WORDS = [
   "Apple", "Mango", "Lemon", "Grape", "Peach", "Melon", "Guava", "Olive", "Berry", "Cherry",
   "Banana", "Papaya", "Plum", "Pear", "Kiwi", "Lime", "Orange", "Raisin", "Almond", "Walnut",
@@ -28,6 +28,9 @@ const WORDS = [
   "Happy", "Brave", "Gentle", "Kind", "Joyful", "Bright", "Calm", "Swift", "Lucky", "Cheer",
 ] as const;
 
+// Symbols with a short spoken name ("at", "hash", ...) that are on every phone keyboard.
+const SYMBOLS = ["@", "#", "$", "&", "*", "!"] as const;
+
 /** Uniform random integer in [0, max), without modulo bias. */
 function randomInt(max: number): number {
   const limit = Math.floor(0x1_0000_0000 / max) * max;
@@ -38,7 +41,7 @@ function randomInt(max: number): number {
   return buffer[0] % max;
 }
 
-/** A capitalised simple word plus 3 digits, e.g. "Mango482". */
+/** A capitalised simple word, a symbol and 3 digits, e.g. "Mango@482". */
 export function generatePassword(): string {
-  return `${WORDS[randomInt(WORDS.length)]}${100 + randomInt(900)}`;
+  return `${WORDS[randomInt(WORDS.length)]}${SYMBOLS[randomInt(SYMBOLS.length)]}${100 + randomInt(900)}`;
 }
