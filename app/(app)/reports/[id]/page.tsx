@@ -1,78 +1,58 @@
-"use client";
-
-import { useParams } from "next/navigation";
-import { useState } from "react";
-import type { NextFellowship, Report } from "@/data/types";
+import type { ReportType } from "@/data/types";
 import { PageHeader } from "@/components/PageHeader";
 import { ReportDetail } from "@/components/reports";
 import { NotAvailable } from "@/components/RoleGate";
-import { SavedBanner } from "@/components/SubmittedView";
-import { Button, ConfirmCard, LinkButton } from "@/components/ui";
-import { canEditPlan, getGroupById, getReportById } from "@/lib/data-access";
-import { REPORT_TYPE_LABELS, nowLocalISO } from "@/lib/format";
-import { useCurrentUser } from "@/lib/session";
+import { SavedBanner } from "@/components/SavedBanner";
+import { LinkButton } from "@/components/ui";
+import { requireUser } from "@/lib/auth";
+import { getGroupById, getReportById } from "@/lib/data-access";
+import { REPORT_TYPE_LABELS } from "@/lib/format";
+import { canEditPlan } from "@/lib/report-rules";
+import { PlanActions } from "./PlanActions";
 
-export default function ReportDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const { user } = useCurrentUser();
-  const stored = getReportById(id);
-  const [cancelledAt, setCancelledAt] = useState<string | null>(null);
+const NEW_REPORT: Record<ReportType, { title: string; another: string }> = {
+  fellowship: { title: "Fellowship report submitted", another: "New Fellowship Report" },
+  "follow-up": { title: "Follow-up submitted", another: "New Follow-up" },
+  "next-fellowship": { title: "Next fellowship saved", another: "Plan another" },
+};
 
-  if (!stored) return <NotAvailable message="This report could not be found." />;
-  if (user.role !== "admin" && stored.groupId !== user.groupId) {
-    return <NotAvailable message="You can only view reports for your own group." />;
-  }
+export default async function ReportDetailPage({ params, searchParams }: PageProps<"/reports/[id]">) {
+  const [{ id }, { saved }, user] = await Promise.all([params, searchParams, requireUser()]);
+  const report = await getReportById(id);
+  if (!report) return <NotAvailable message="This report could not be found." />;
+  const group = await getGroupById(report.groupId);
 
-  const report: Report =
-    cancelledAt && stored.type === "next-fellowship" ? { ...stored, cancelledAt } : stored;
+  const banner =
+    saved === "new"
+      ? NEW_REPORT[report.type].title
+      : saved === "updated"
+        ? "Next fellowship updated"
+        : saved === "cancelled"
+          ? "Plan cancelled"
+          : undefined;
 
   return (
     <>
       <PageHeader
         title={REPORT_TYPE_LABELS[report.type]}
-        subtitle={getGroupById(report.groupId)?.name}
-        backHref="/reports"
+        subtitle={group?.name}
+        backHref={saved ? "/home" : "/reports"}
       />
-      <div className="p-4">
-        {cancelledAt && <SavedBanner title="Plan cancelled" />}
+      <div className="p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        {banner && <SavedBanner title={banner} />}
         <ReportDetail report={report} />
-        {report.type === "next-fellowship" && canEditPlan(user, report) && (
-          <PlanActions plan={report} onCancel={() => setCancelledAt(nowLocalISO())} />
+        {report.type === "next-fellowship" && canEditPlan(user, report) && <PlanActions planId={report.id} />}
+        {saved === "new" && (
+          <div className="mt-6 space-y-2">
+            <LinkButton href="/home" size="lg" block>
+              Back to Home
+            </LinkButton>
+            <LinkButton href={`/new/${report.type}`} variant="secondary" size="lg" block>
+              {NEW_REPORT[report.type].another}
+            </LinkButton>
+          </div>
         )}
       </div>
     </>
-  );
-}
-
-function PlanActions({ plan, onCancel }: { plan: NextFellowship; onCancel: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-
-  if (confirming) {
-    return (
-      <div className="mt-4">
-        <ConfirmCard
-          title="Cancel this fellowship plan?"
-          description="The plan will no longer show as upcoming. It stays in the group's reports."
-          confirmLabel="Cancel plan"
-          onBack={() => setConfirming(false)}
-          onConfirm={() => {
-            setConfirming(false);
-            onCancel();
-            window.scrollTo(0, 0);
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 grid grid-cols-2 gap-2">
-      <LinkButton href={`/reports/${plan.id}/edit`} variant="secondary">
-        Edit plan
-      </LinkButton>
-      <Button variant="danger" onClick={() => setConfirming(true)}>
-        Cancel plan
-      </Button>
-    </div>
   );
 }

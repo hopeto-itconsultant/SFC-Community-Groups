@@ -1,7 +1,7 @@
-# SFC Community Groups – Prototype
+# SFC Community Groups
 
-Mobile-first UI prototype for Community Groups management and reporting.
-No database, no real login: all data is static mock data, and submitted forms are shown back but not saved.
+Mobile-first app for Community Groups management and reporting, on Next.js and Supabase (database, logins and photo storage).
+The `prototype` branch keeps the original static demo and its dummy data for reference.
 
 ## Run
 
@@ -10,11 +10,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. To try it on a phone on the same Wi-Fi, run `npm run dev -- -H 0.0.0.0` and open `http://<your-computer-ip>:3000`.
+Open http://localhost:3000 and sign in with a mobile number and password. To try it on a phone on the same Wi-Fi, run `npm run dev -- -H 0.0.0.0` and open `http://<your-computer-ip>:3000`.
 
 ## Database (Supabase)
-
-The live app is being built on `main`. The screens still use the mock data; the database below is set up but not used by the app yet. The database starts empty; the `prototype` branch keeps the original static demo and its dummy data for reference.
 
 One-time setup (needs the [Supabase CLI](https://supabase.com/docs/guides/cli)):
 
@@ -22,33 +20,35 @@ One-time setup (needs the [Supabase CLI](https://supabase.com/docs/guides/cli)):
 2. Copy `.env.example` to `.env.local` and fill in the dev project's URL and keys.
 3. `supabase login` (with the account that owns the project) then `supabase link --project-ref <dev-project-ref>`.
 4. `npm run db:push` – applies the migrations in `supabase/migrations/`.
-5. `npm run create-admin` – creates the first Admin login (name, mobile number with country code, password). Runs once; the Admin adds everyone else from the app.
-6. `npm run db:types` – regenerates `lib/database.types.ts` from the linked database. Re-run after every schema change.
+5. `npm run create-admin` – creates the first Admin login (name, mobile number, password). Runs once.
+6. `npm run import-groups` – optional: imports the real groups, leader rosters and group photos from the prototype (`data/groups.ts`, `data/users.ts`, `public/groups/`). Runs once, into an empty database.
+7. `npm run db:types` – regenerates `lib/database.types.ts` from the linked database. Re-run after every schema change.
 
 Change the schema only through new migrations (`supabase migration new <name>`), never by editing tables in the dashboard.
 
-## Demo users
+## Logins
 
-Pick any user on the login screen: Admin, every group leader, and every assistant leader.
+Everyone signs in with their mobile number and a password; there are no SMS codes. The Admin creates logins in the app: **Groups > a group > Leaders & logins**, where they can add a leader or assistant leader, set up their login (a readable password is suggested) and reset a forgotten password.
 
-## Prototype rules
+## Rules
 
-- **Meeting frequency:** Men's meets monthly; every other group meets every 2 months. Fixed in `data/groups.ts` for now; Admin will be able to change it in the live version.
 - **Fellowship reports:** up to 3 photos, and the fellowship date must be within the last 7 days.
-- **Groups:** Admin can add a group, and can close a group instead of deleting it (its past reports are kept). Admin and the group's leaders can edit the group's profile and photo.
+- **Groups:** Admin can add a group, and can close a group instead of deleting it (its past reports are kept). Admin and the group's leaders can edit the group's profile and photo; only Admin changes how often it meets.
 - **Next fellowship plans:** Admin and the group's leaders can edit or cancel an upcoming plan from its detail page.
-- None of these changes are saved: each screen shows the result with a "Prototype: not saved" note.
+- **Access:** leaders and assistant leaders see only their own group; the Admin sees everything. This is enforced by the database's access rules (`supabase/migrations/*_access_rules.sql`), not only by the screens.
 
 ## Where things live
 
-- `data/` – mock data (`groups.ts`, `users.ts`, `reports.ts`) and types (`types.ts`)
-- `lib/data-access.ts` – the only place screens read data from; replace with Supabase queries later
-- `components/PhotoPicker.tsx` – photo selection/preview; swap in Supabase Storage upload later
-- `supabase/migrations/` – database schema; `scripts/create-admin.mjs` – creates the first Admin login
-- `app/(app)/` – signed-in screens (Home, My Group, Groups, Reports, New Report forms, More), plus Add Group (`groups/new`), Edit Group (`groups/[id]/edit`) and Edit Plan (`reports/[id]/edit`)
+- `lib/data-access.ts` – all reads from Supabase, used by Server Components; `lib/report-rules.ts` – pure rules shared with Client Components
+- `lib/actions/` – Server Actions for everything that saves (sign in/out, reports, groups, leaders and logins)
+- `lib/auth.ts` – the signed-in user; `proxy.ts` – keeps the login session fresh and sends signed-out visitors to the login page
+- `app/photos/` – serves private photos from Supabase Storage to signed-in users who may see them
+- `components/PhotoPicker.tsx` + `lib/compress-image.ts` – photo selection; photos are resized (and HEIC converted) in the browser before upload
+- `supabase/migrations/` – database schema; `scripts/` – `create-admin` and `import-groups`
+- `app/(app)/` – signed-in screens (Home, My Group, Groups, Reports, New Report forms, More), plus Add Group (`groups/new`), Edit Group (`groups/[id]/edit`), Leaders & logins (`groups/[id]/people`) and Edit Plan (`reports/[id]/edit`)
 
 ## Your assets
 
 - **Logo:** replace `public/brand/logo.jpg` (or change `LOGO_SRC` in `lib/brand.ts`).
-- **Group photos:** put files in `public/groups/` named by group id (e.g. `womens-cg.jpg`) and set `photo: "/groups/womens-cg.jpg"` on the group in `data/groups.ts`. Groups without a photo show initials.
-- **HEIC photos (iPhone):** drop `.heic` files into `public/groups/` and run `npm run images`. They are converted to resized JPGs (most browsers can't show HEIC) and the originals are moved to `assets-source/groups/`.
+- **Group photos:** upload them in the app (Edit Group). `public/groups/` only holds the photos used by `npm run import-groups`.
+- **HEIC photos (iPhone):** the app converts them on upload. For `public/groups/`, run `npm run images` to convert `.heic` files there to JPGs.

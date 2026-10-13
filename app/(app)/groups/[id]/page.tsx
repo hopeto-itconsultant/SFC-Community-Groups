@@ -1,23 +1,21 @@
-"use client";
-
-import { useParams } from "next/navigation";
-import { useState } from "react";
-import type { CommunityGroup, Report } from "@/data/types";
+import type { Report } from "@/data/types";
 import { GroupProfile } from "@/components/groups";
 import { PageHeader } from "@/components/PageHeader";
 import { NextFellowshipSummary, ReportCard } from "@/components/reports";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
-import { SavedBanner } from "@/components/SubmittedView";
-import { Button, ConfirmCard, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { getGroupById, getNextFellowship, getReports, isGroupClosed } from "@/lib/data-access";
-import { todayISO } from "@/lib/format";
+import { SavedBanner } from "@/components/SavedBanner";
+import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
+import { getGroupById, getNextFellowship, getReports } from "@/lib/data-access";
+import { isGroupClosed } from "@/lib/report-rules";
+import { CloseGroupButton } from "./CloseGroupButton";
 
 const RECENT_LIMIT = 3;
 
-export default function AdminGroupPage() {
+export default async function AdminGroupPage({ params, searchParams }: PageProps<"/groups/[id]">) {
+  const [{ id }, { saved }] = await Promise.all([params, searchParams]);
   return (
     <RoleGate allow={["admin"]}>
-      <AdminGroupView />
+      <AdminGroupView id={id} saved={typeof saved === "string" ? saved : undefined} />
     </RoleGate>
   );
 }
@@ -33,33 +31,42 @@ function RecentList({ reports, empty }: { reports: Report[]; empty: string }) {
   );
 }
 
-function AdminGroupView() {
-  const { id } = useParams<{ id: string }>();
-  const stored = getGroupById(id);
-  const [closedNow, setClosedNow] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  if (!stored) return <NotAvailable message="This group could not be found." />;
+async function AdminGroupView({ id, saved }: { id: string; saved?: string }) {
+  const group = await getGroupById(id);
+  if (!group) return <NotAvailable message="This group could not be found." />;
 
-  const group: CommunityGroup = closedNow
-    ? { ...stored, status: "closed", closedAt: todayISO() }
-    : stored;
   const closed = isGroupClosed(group);
-  const next = closed ? undefined : getNextFellowship(group.id);
-  const fellowships = getReports({ groupId: group.id, type: "fellowship" });
-  const followUps = getReports({ groupId: group.id, type: "follow-up" });
+  const [next, fellowships, followUps] = await Promise.all([
+    closed ? undefined : getNextFellowship(group.id),
+    getReports({ groupId: group.id, type: "fellowship" }),
+    getReports({ groupId: group.id, type: "follow-up" }),
+  ]);
+  const banner =
+    saved === "added"
+      ? `${group.name} added`
+      : saved === "updated"
+        ? `${group.name} updated`
+        : saved === "closed"
+          ? `${group.name} closed. Past reports are kept.`
+          : undefined;
 
   return (
     <>
       <PageHeader title={group.name} subtitle={group.category} backHref="/groups" />
       <div className="p-4">
-        {closedNow && <SavedBanner title={`${group.name} closed. Past reports are kept.`} />}
+        {banner && <SavedBanner title={banner} />}
 
         <GroupProfile group={group} />
-        {!closed && (
-          <LinkButton href={`/groups/${group.id}/edit`} variant="secondary" block className="mt-3">
-            Edit group profile
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <LinkButton href={`/groups/${group.id}/people`} variant="secondary">
+            Leaders &amp; logins
           </LinkButton>
-        )}
+          {!closed && (
+            <LinkButton href={`/groups/${group.id}/edit`} variant="secondary">
+              Edit profile
+            </LinkButton>
+          )}
+        </div>
 
         {!closed && (
           <>
@@ -80,23 +87,7 @@ function AdminGroupView() {
 
         {!closed && (
           <div className="mt-8 border-t border-slate-200 pt-4">
-            {confirming ? (
-              <ConfirmCard
-                title={`Close ${group.name}?`}
-                description="The group will be hidden from the dashboard and lists. Its past reports are kept and can still be viewed."
-                confirmLabel="Close group"
-                onBack={() => setConfirming(false)}
-                onConfirm={() => {
-                  setConfirming(false);
-                  setClosedNow(true);
-                  window.scrollTo(0, 0);
-                }}
-              />
-            ) : (
-              <Button variant="danger" block onClick={() => setConfirming(true)}>
-                Close group
-              </Button>
-            )}
+            <CloseGroupButton groupId={group.id} groupName={group.name} />
           </div>
         )}
       </div>

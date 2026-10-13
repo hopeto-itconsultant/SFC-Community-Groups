@@ -1,59 +1,38 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import type { CommunityGroup, Frequency } from "@/data/types";
+import type { FormState } from "@/lib/actions/types";
 import { FREQUENCY_LABELS } from "@/lib/format";
 import { Field, FormSection, SubmitBar, inputClass } from "./form";
-import { PhotoPicker, type PhotoItem } from "./PhotoPicker";
+import { PhotoPicker, appendPhotos, usePhotoItems } from "./PhotoPicker";
 
 const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
 
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-/**
- * Add/edit form for a group's profile. The parent owns `photos` so preview URLs
- * stay valid on the result screen after the form unmounts.
- */
+/** Add/edit form for a group's profile. */
 export function GroupForm({
   initial,
   canEditFrequency,
-  photos,
-  onPhotosChange,
   submitLabel,
-  onSubmit,
+  action,
 }: {
   initial?: CommunityGroup;
-  /** Frequency is fixed for the prototype; only Admin may change it. */
+  /** Only the Admin may change how often a group meets. */
   canEditFrequency: boolean;
-  photos: PhotoItem[];
-  onPhotosChange: (photos: PhotoItem[]) => void;
   submitLabel: string;
-  onSubmit: (group: CommunityGroup) => void;
+  action: (prev: FormState, formData: FormData) => Promise<FormState>;
 }) {
+  const [state, formAction, pending] = useActionState(action, {});
+  const { photos, setPhotos } = usePhotoItems();
   const [name, setName] = useState(initial?.name ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [frequency, setFrequency] = useState<Frequency>(initial?.frequency ?? "every-2-months");
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const trimmedName = name.trim();
-    onSubmit({
-      id: initial?.id ?? `draft-${slugify(trimmedName) || Date.now()}`,
-      leaderIds: initial?.leaderIds ?? [],
-      assistantLeaderIds: initial?.assistantLeaderIds ?? [],
-      status: initial?.status,
-      closedAt: initial?.closedAt,
-      name: trimmedName,
-      category: category.trim() || undefined,
-      frequency,
-      photo: photos[0]?.previewUrl ?? initial?.photo,
-    });
+    const formData = appendPhotos(new FormData(e.currentTarget), "photo", photos);
+    startTransition(() => formAction(formData));
   }
 
   return (
@@ -61,6 +40,7 @@ export function GroupForm({
       <FormSection title="Group Details">
         <Field label="Group Name">
           <input
+            name="name"
             type="text"
             required
             value={name}
@@ -73,6 +53,7 @@ export function GroupForm({
         </Field>
         <Field label="Category" optional>
           <input
+            name="category"
             type="text"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -84,6 +65,7 @@ export function GroupForm({
         {canEditFrequency ? (
           <Field label="Fellowship Frequency">
             <select
+              name="frequency"
               value={frequency}
               onChange={(e) => setFrequency(e.target.value as Frequency)}
               className={inputClass}
@@ -98,7 +80,7 @@ export function GroupForm({
         ) : (
           <div>
             <p className="mb-1.5 text-sm font-semibold text-slate-700">Fellowship Frequency</p>
-            <p className="text-base">{FREQUENCY_LABELS[frequency]}</p>
+            <p className="text-base">{initial?.frequency ? FREQUENCY_LABELS[initial.frequency] : "Not set"}</p>
             <p className="mt-1 text-xs text-slate-500">Only Admin can change how often a group meets.</p>
           </div>
         )}
@@ -113,13 +95,14 @@ export function GroupForm({
               fill
               sizes="(max-width: 576px) 100vw, 576px"
               className="object-cover"
+              unoptimized
             />
           </div>
         )}
-        <PhotoPicker value={photos} onChange={onPhotosChange} max={1} />
+        <PhotoPicker value={photos} onChange={setPhotos} max={1} />
       </FormSection>
 
-      <SubmitBar label={submitLabel} />
+      <SubmitBar label={submitLabel} error={state.error} pending={pending} />
     </form>
   );
 }

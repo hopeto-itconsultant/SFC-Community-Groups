@@ -1,30 +1,32 @@
-"use client";
-
 import { GroupProfile } from "@/components/groups";
 import { PageHeader } from "@/components/PageHeader";
 import { NextFellowshipSummary } from "@/components/reports";
-import { RoleGate } from "@/components/RoleGate";
+import { NotAvailable, RoleGate } from "@/components/RoleGate";
+import { SavedBanner } from "@/components/SavedBanner";
 import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { getNextFellowship } from "@/lib/data-access";
-import { useCurrentUser } from "@/lib/session";
+import { requireUser } from "@/lib/auth";
+import { getGroupById, getNextFellowship } from "@/lib/data-access";
 
-export default function MyGroupPage() {
+export default async function MyGroupPage({ searchParams }: PageProps<"/group">) {
+  const { saved } = await searchParams;
   return (
     <RoleGate allow={["leader", "asst-leader"]}>
-      <MyGroup />
+      <MyGroup saved={saved === "updated"} />
     </RoleGate>
   );
 }
 
-function MyGroup() {
-  const { group } = useCurrentUser();
-  if (!group) return null;
-  const next = getNextFellowship(group.id);
+async function MyGroup({ saved }: { saved: boolean }) {
+  const user = await requireUser();
+  const group = await getGroupById(user.groupId);
+  if (!group) return <NotAvailable message="You're not assigned to a group yet." />;
+  const next = await getNextFellowship(group.id);
 
   return (
     <>
       <PageHeader title="My Group" />
       <div className="p-4">
+        {saved && <SavedBanner title={`${group.name} updated`} />}
         <GroupProfile group={group} />
         <LinkButton href={`/groups/${group.id}/edit`} variant="secondary" block className="mt-3">
           Edit group profile

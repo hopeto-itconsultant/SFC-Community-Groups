@@ -1,11 +1,10 @@
-"use client";
-
 import Link from "next/link";
 import { LEADER_ROLES } from "@/components/form";
 import { ChevronRightIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import { RoleGate } from "@/components/RoleGate";
-import { useCurrentUser } from "@/lib/session";
+import { requireUser } from "@/lib/auth";
+import { getGroupById } from "@/lib/data-access";
 
 const OPTIONS = [
   {
@@ -36,8 +35,9 @@ export default function NewReportPage() {
   );
 }
 
-function NewReportChooser() {
-  const { group } = useCurrentUser();
+async function NewReportChooser() {
+  const user = await requireUser();
+  const group = await getGroupById(user.groupId);
   return (
     <>
       <PageHeader title="New Report" subtitle={group?.name} backHref="/home" />

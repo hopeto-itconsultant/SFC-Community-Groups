@@ -7,15 +7,19 @@ import {
   getGroupLeaders,
   getLastFellowship,
   getNextFellowship,
-  isGroupClosed,
 } from "@/lib/data-access";
 import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDate } from "@/lib/format";
-import { GroupAvatar, isLocalPreview } from "./GroupAvatar";
+import { isGroupClosed } from "@/lib/report-rules";
+import { GroupAvatar } from "./GroupAvatar";
 import { ChevronRightIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
 export function namesOrNotAssigned(people: User[]): string {
   return people.length ? people.map((p) => p.name).join(", ") : NOT_ASSIGNED;
+}
+
+function categoryAndFrequency(group: CommunityGroup): string {
+  return [group.category, group.frequency && FREQUENCY_LABELS[group.frequency]].filter(Boolean).join(" · ");
 }
 
 function PeopleList({ people }: { people: User[] }) {
@@ -63,9 +67,9 @@ export function ClosedBadge() {
   return <Badge tone="slate">Closed</Badge>;
 }
 
-function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
+async function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
   if (isGroupClosed(group)) return <ClosedBadge />;
-  const next = getNextFellowship(group.id);
+  const next = await getNextFellowship(group.id);
   return next ? (
     <Badge tone="green">Next {formatShortDate(next.proposedDate)}</Badge>
   ) : (
@@ -73,14 +77,14 @@ function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
   );
 }
 
-function lastFellowshipText(groupId: string): string {
-  const last = getLastFellowship(groupId);
+async function lastFellowshipText(groupId: string): Promise<string> {
+  const last = await getLastFellowship(groupId);
   return last ? `Last ${formatShortDate(last.date)}` : "No reports yet";
 }
 
 /** Small tappable card for the Admin dashboard grid. */
-export function GroupMiniCard({ group }: { group: CommunityGroup }) {
-  const leaders = getGroupLeaders(group);
+export async function GroupMiniCard({ group }: { group: CommunityGroup }) {
+  const [leaders, lastText] = await Promise.all([getGroupLeaders(group), lastFellowshipText(group.id)]);
   return (
     <Link
       href={`/groups/${group.id}`}
@@ -94,7 +98,7 @@ export function GroupMiniCard({ group }: { group: CommunityGroup }) {
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{group.name}</p>
       <p className="truncate text-xs text-slate-500">{namesOrNotAssigned(leaders)}</p>
-      <p className="mt-1 text-xs text-slate-500">{lastFellowshipText(group.id)}</p>
+      <p className="mt-1 text-xs text-slate-500">{lastText}</p>
     </Link>
   );
 }
@@ -109,11 +113,13 @@ function MiniInfo({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Larger card for the Admin Groups tab grid (two per row). */
-export function GroupDetailCard({ group }: { group: CommunityGroup }) {
-  const leaders = getGroupLeaders(group);
-  const assistants = getGroupAssistantLeaders(group);
-  const last = getLastFellowship(group.id);
-  const next = getNextFellowship(group.id);
+export async function GroupDetailCard({ group }: { group: CommunityGroup }) {
+  const [leaders, assistants, last, next] = await Promise.all([
+    getGroupLeaders(group),
+    getGroupAssistantLeaders(group),
+    getLastFellowship(group.id),
+    getNextFellowship(group.id),
+  ]);
 
   return (
     <Link
@@ -128,7 +134,7 @@ export function GroupDetailCard({ group }: { group: CommunityGroup }) {
             fill
             sizes="(max-width: 576px) 50vw, 288px"
             className="object-cover"
-            unoptimized={isLocalPreview(group.photo)}
+            unoptimized
           />
         ) : (
           <GroupAvatar group={group} size="lg" />
@@ -139,10 +145,7 @@ export function GroupDetailCard({ group }: { group: CommunityGroup }) {
       </div>
       <div className="p-3">
         <p className="line-clamp-2 text-sm font-semibold leading-snug">{group.name}</p>
-        <p className="truncate text-xs text-slate-500">
-          {group.category ? `${group.category} · ` : ""}
-          {FREQUENCY_LABELS[group.frequency]}
-        </p>
+        <p className="truncate text-xs text-slate-500">{categoryAndFrequency(group)}</p>
         <dl className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
           <MiniInfo label={leaders.length > 1 ? "Leaders" : "Leader"}>
             <span className={leaders.length ? "" : "text-slate-400"}>{namesOrNotAssigned(leaders)}</span>
@@ -171,8 +174,8 @@ export function GroupDetailCard({ group }: { group: CommunityGroup }) {
 }
 
 /** One-line group summary used on the Admin dashboard; place inside a divided Card. */
-export function GroupSummaryRow({ group }: { group: CommunityGroup }) {
-  const leaders = getGroupLeaders(group);
+export async function GroupSummaryRow({ group }: { group: CommunityGroup }) {
+  const [leaders, lastText] = await Promise.all([getGroupLeaders(group), lastFellowshipText(group.id)]);
 
   return (
     <Link
@@ -188,7 +191,7 @@ export function GroupSummaryRow({ group }: { group: CommunityGroup }) {
           </span>
         </div>
         <p className="truncate text-xs text-slate-500">
-          {namesOrNotAssigned(leaders)} · {lastFellowshipText(group.id)}
+          {namesOrNotAssigned(leaders)} · {lastText}
         </p>
       </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
@@ -197,8 +200,8 @@ export function GroupSummaryRow({ group }: { group: CommunityGroup }) {
 }
 
 /** Compact tappable row used on the Admin Groups list. */
-export function GroupListItem({ group }: { group: CommunityGroup }) {
-  const leaders = getGroupLeaders(group);
+export async function GroupListItem({ group }: { group: CommunityGroup }) {
+  const leaders = await getGroupLeaders(group);
   return (
     <Link
       href={`/groups/${group.id}`}
@@ -210,10 +213,7 @@ export function GroupListItem({ group }: { group: CommunityGroup }) {
           <p className="min-w-0 truncate font-bold">{group.name}</p>
           {isGroupClosed(group) && <ClosedBadge />}
         </div>
-        <p className="truncate text-sm text-slate-500">
-          {group.category ? `${group.category} · ` : ""}
-          {FREQUENCY_LABELS[group.frequency]}
-        </p>
+        <p className="truncate text-sm text-slate-500">{categoryAndFrequency(group)}</p>
         <p className={`truncate text-sm ${leaders.length ? "text-slate-700" : "text-slate-400"}`}>
           {namesOrNotAssigned(leaders)}
         </p>
@@ -224,9 +224,8 @@ export function GroupListItem({ group }: { group: CommunityGroup }) {
 }
 
 /** Group information and leadership, shared by My Group and the Admin group view. */
-export function GroupProfile({ group }: { group: CommunityGroup }) {
-  const leaders = getGroupLeaders(group);
-  const assistants = getGroupAssistantLeaders(group);
+export async function GroupProfile({ group }: { group: CommunityGroup }) {
+  const [leaders, assistants] = await Promise.all([getGroupLeaders(group), getGroupAssistantLeaders(group)]);
 
   return (
     <Card className="overflow-hidden">
@@ -239,7 +238,7 @@ export function GroupProfile({ group }: { group: CommunityGroup }) {
             sizes="(max-width: 576px) 100vw, 576px"
             className="object-cover"
             priority
-            unoptimized={isLocalPreview(group.photo)}
+            unoptimized
           />
         </div>
       )}
@@ -255,7 +254,7 @@ export function GroupProfile({ group }: { group: CommunityGroup }) {
         {isGroupClosed(group) && group.closedAt && (
           <InfoRow label="Closed">{formatDate(group.closedAt)}</InfoRow>
         )}
-        <InfoRow label="Fellowship">{FREQUENCY_LABELS[group.frequency]}</InfoRow>
+        {group.frequency && <InfoRow label="Fellowship">{FREQUENCY_LABELS[group.frequency]}</InfoRow>}
         <InfoRow label={leaders.length > 1 ? "Leaders" : "Leader"}>
           <PeopleList people={leaders} />
         </InfoRow>

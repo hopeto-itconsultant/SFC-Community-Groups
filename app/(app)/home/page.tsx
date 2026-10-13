@@ -1,14 +1,14 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { CommunityGroup, User } from "@/data/types";
 import { GroupMiniCard, GroupSummaryRow, StatCard } from "@/components/groups";
 import { CalendarIcon, ChevronRightIcon, FileTextIcon } from "@/components/icons";
-import { Badge, Card, SectionTitle } from "@/components/ui";
-import { ViewToggle, useStoredView } from "@/components/ViewToggle";
+import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
+import { ViewSwitch } from "@/components/ViewToggle";
+import { requireUser } from "@/lib/auth";
 import {
+  getGroupById,
   getGroups,
   getLastFellowship,
   getNextFellowship,
@@ -18,12 +18,12 @@ import {
 } from "@/lib/data-access";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
 import { ROLE_LABELS, formatRupees, formatShortDate } from "@/lib/format";
-import { useCurrentUser } from "@/lib/session";
 
-export default function HomePage() {
-  const { user, group } = useCurrentUser();
+export default async function HomePage() {
+  const user = await requireUser();
   if (user.role === "admin") return <AdminHome user={user} />;
-  if (!group) return null;
+  const group = await getGroupById(user.groupId);
+  if (!group) return <NoGroupHome user={user} />;
   return <LeaderHome user={user} group={group} />;
 }
 
@@ -50,9 +50,12 @@ function Hero({ user, subtitle }: { user: User; subtitle?: string }) {
   );
 }
 
-function AdminHome({ user }: { user: User }) {
-  const groups = getGroups();
-  const [view, setView] = useStoredView("sfc.homeGroupView");
+async function AdminHome({ user }: { user: User }) {
+  const [groups, filedThisMonth, upcoming] = await Promise.all([
+    getGroups(),
+    getReportsFiledThisMonth(),
+    getUpcomingFellowships(),
+  ]);
 
   return (
     <>
@@ -62,30 +65,60 @@ function AdminHome({ user }: { user: User }) {
           <StatCard label="Groups" value={groups.length} href="/groups" />
           <StatCard
             label="Reports this month"
-            value={getReportsFiledThisMonth().length}
+            value={filedThisMonth.length}
             href="/reports?period=this-month"
           />
           <StatCard
             label="Planned fellowships"
-            value={getUpcomingFellowships().length}
+            value={upcoming.length}
             href="/reports?type=next-fellowship&period=upcoming"
           />
         </div>
 
-        <SectionTitle action={<ViewToggle view={view} onChange={setView} />}>CG Status</SectionTitle>
-        {view === "cards" ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {groups.map((g) => (
-              <GroupMiniCard key={g.id} group={g} />
-            ))}
-          </div>
+        {groups.length ? (
+          <ViewSwitch
+            storageKey="sfc.homeGroupView"
+            title="CG Status"
+            placement="section"
+            cards={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {groups.map((g) => (
+                  <GroupMiniCard key={g.id} group={g} />
+                ))}
+              </div>
+            }
+            list={
+              <Card className="divide-y divide-slate-100 overflow-hidden p-0">
+                {groups.map((g) => (
+                  <GroupSummaryRow key={g.id} group={g} />
+                ))}
+              </Card>
+            }
+          />
         ) : (
-          <Card className="divide-y divide-slate-100 overflow-hidden p-0">
-            {groups.map((g) => (
-              <GroupSummaryRow key={g.id} group={g} />
-            ))}
-          </Card>
+          <>
+            <SectionTitle>CG Status</SectionTitle>
+            <EmptyState
+              title="No groups yet"
+              description="Add the first community group to get started."
+              action={<LinkButton href="/groups/new">Add group</LinkButton>}
+            />
+          </>
         )}
+      </div>
+    </>
+  );
+}
+
+function NoGroupHome({ user }: { user: User }) {
+  return (
+    <>
+      <Hero user={user} />
+      <div className="p-4">
+        <EmptyState
+          title="You're not assigned to a group yet"
+          description="Please ask the Admin to add you to your community group."
+        />
       </div>
     </>
   );
@@ -130,9 +163,8 @@ function StatusRow({
   );
 }
 
-function LeaderStatusCard({ groupId }: { groupId: string }) {
-  const next = getNextFellowship(groupId);
-  const last = getLastFellowship(groupId);
+async function LeaderStatusCard({ groupId }: { groupId: string }) {
+  const [next, last] = await Promise.all([getNextFellowship(groupId), getLastFellowship(groupId)]);
 
   return (
     <Card className="divide-y divide-slate-100 overflow-hidden p-0">
@@ -172,8 +204,12 @@ function LeaderStatusCard({ groupId }: { groupId: string }) {
   );
 }
 
-function LeaderHome({ user, group }: { user: User; group: CommunityGroup }) {
-  const spentThisMonth = getReportTypeSummaries(group.id).expenditure.thisMonthAmount;
+async function LeaderHome({ user, group }: { user: User; group: CommunityGroup }) {
+  const [summaries, filedThisMonth, upcoming] = await Promise.all([
+    getReportTypeSummaries(group.id),
+    getReportsFiledThisMonth(group.id),
+    getUpcomingFellowships(group.id),
+  ]);
 
   return (
     <>
@@ -182,17 +218,17 @@ function LeaderHome({ user, group }: { user: User; group: CommunityGroup }) {
         <div className="grid grid-cols-3 gap-2">
           <StatCard
             label="Reports this month"
-            value={getReportsFiledThisMonth(group.id).length}
+            value={filedThisMonth.length}
             href="/reports?period=this-month"
           />
           <StatCard
             label="Planned fellowships"
-            value={getUpcomingFellowships(group.id).length}
+            value={upcoming.length}
             href="/reports?type=next-fellowship&period=upcoming"
           />
           <StatCard
             label="Spent this month"
-            value={formatRupees(spentThisMonth)}
+            value={formatRupees(summaries.expenditure.thisMonthAmount)}
             href="/reports?view=expenses&period=this-month"
           />
         </div>

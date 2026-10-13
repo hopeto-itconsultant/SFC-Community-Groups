@@ -1,6 +1,7 @@
 import type { ReportType } from "@/data/types";
-import type { ReportPeriod } from "@/lib/data-access";
+import { requireUser } from "@/lib/auth";
 import { REPORT_TYPE_LABELS } from "@/lib/format";
+import type { ReportPeriod } from "@/lib/report-rules";
 import { ReportsView } from "./ReportsView";
 
 const PERIODS: ReportPeriod[] = ["this-month", "upcoming"];
@@ -16,12 +17,13 @@ function asPeriod(value: unknown): ReportPeriod | undefined {
 }
 
 export default async function ReportsPage({ searchParams }: PageProps<"/reports">) {
-  const { group, type, period, view } = await searchParams;
+  const [{ group, type, period, view }, user] = await Promise.all([searchParams, requireUser()]);
   return (
     <ReportsView
-      initialGroupId={typeof group === "string" ? group : undefined}
-      initialType={asReportType(type)}
-      initialPeriod={asPeriod(period)}
+      user={user}
+      groupId={typeof group === "string" ? group : undefined}
+      type={asReportType(type)}
+      period={asPeriod(period)}
       expenses={view === "expenses"}
     />
   );

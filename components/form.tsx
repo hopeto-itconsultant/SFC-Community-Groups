@@ -56,7 +56,15 @@ export function FiledBy({ user, group }: { user: User; group: CommunityGroup }) 
   );
 }
 
-export function SubmitBar({ label, error }: { label: string; error?: string | null }) {
+export function SubmitBar({
+  label,
+  error,
+  pending = false,
+}: {
+  label: string;
+  error?: string | null;
+  pending?: boolean;
+}) {
   return (
     <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
       {error && (
@@ -64,8 +72,8 @@ export function SubmitBar({ label, error }: { label: string; error?: string | nu
           {error}
         </p>
       )}
-      <Button type="submit" size="lg" block>
-        {label}
+      <Button type="submit" size="lg" block disabled={pending}>
+        {pending ? "SAVING…" : label}
       </Button>
     </div>
   );

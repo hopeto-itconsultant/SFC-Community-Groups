@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { APP_NAME, LOGO_SRC, THEME_COLOR } from "@/lib/brand";
-import { SessionProvider } from "@/lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: APP_NAME,
-  description: "Community Groups management and reporting (prototype)",
+  description: "Community Groups management and reporting",
   icons: { icon: LOGO_SRC, apple: LOGO_SRC },
 };
 
@@ -21,7 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full">
-        <SessionProvider>{children}</SessionProvider>
+        {children}
         <Analytics />
       </body>
     </html>

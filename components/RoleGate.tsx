@@ -1,13 +1,12 @@
-"use client";
-
 import type { ReactNode } from "react";
 import type { Role } from "@/data/types";
-import { useCurrentUser } from "@/lib/session";
+import { requireUser } from "@/lib/auth";
 import { PageHeader } from "./PageHeader";
 import { EmptyState, LinkButton } from "./ui";
 
-export function RoleGate({ allow, children }: { allow: Role[]; children: ReactNode }) {
-  const { user } = useCurrentUser();
+/** Renders `children` (and so loads their data) only for the allowed roles. */
+export async function RoleGate({ allow, children }: { allow: Role[]; children: ReactNode }) {
+  const user = await requireUser();
   if (allow.includes(user.role)) return <>{children}</>;
   return <NotAvailable />;
 }

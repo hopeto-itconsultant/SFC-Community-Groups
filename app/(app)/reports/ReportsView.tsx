@@ -1,8 +1,6 @@
-"use client";
-
-import { type ReactNode, useState } from "react";
-import type { FellowshipReport, FollowUpReport, ReportType } from "@/data/types";
-import { inputClass } from "@/components/form";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import type { FellowshipReport, FollowUpReport, ReportType, User } from "@/data/types";
 import { PlusIcon, XIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -14,19 +12,13 @@ import {
   ReportTypeCard,
 } from "@/components/reports";
 import { EmptyState, LinkButton } from "@/components/ui";
-import {
-  type ReportPeriod,
-  getGroupById,
-  getGroups,
-  getReportTypeSummaries,
-  getReports,
-} from "@/lib/data-access";
+import { getGroupById, getGroups, getReportTypeSummaries, getReports } from "@/lib/data-access";
 import { CONTACT_MODES, formatRupees } from "@/lib/format";
-import { useCurrentUser } from "@/lib/session";
+import type { ReportPeriod } from "@/lib/report-rules";
+import { GroupSelect } from "./GroupSelect";
+import { type ReportsParams, reportsHref } from "./hrefs";
 
 const REPORT_TYPES: ReportType[] = ["fellowship", "follow-up", "next-fellowship"];
-
-const ALL_GROUPS = "all";
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   "this-month": "Filed this month",
@@ -38,49 +30,15 @@ const PERIOD_TITLES: Record<ReportPeriod, string> = {
   upcoming: "Upcoming",
 };
 
-function reportsHref(params: {
-  type?: ReportType;
-  period?: ReportPeriod;
-  group?: string;
-  expenses?: boolean;
-}) {
-  const query = new URLSearchParams();
-  if (params.expenses) query.set("view", "expenses");
-  if (params.type) query.set("type", params.type);
-  if (params.period) query.set("period", params.period);
-  if (params.group) query.set("group", params.group);
-  const qs = query.toString();
-  return qs ? `/reports?${qs}` : "/reports";
-}
-
 /** Admins pick any group (or all); leaders and asst. leaders are fixed to their own. */
-function useGroupScope(initialGroupId: string | undefined) {
-  const { user, group } = useCurrentUser();
+async function groupScope(user: User, requestedGroupId: string | undefined) {
   const isAdmin = user.role === "admin";
-  const [groupFilter, setGroupFilter] = useState(
-    getGroupById(initialGroupId) ? initialGroupId! : ALL_GROUPS,
-  );
-  const groupId = isAdmin ? (groupFilter === ALL_GROUPS ? undefined : groupFilter) : group?.id;
-  const subtitle = isAdmin ? (getGroupById(groupId)?.name ?? "All groups") : group?.name;
-  return { isAdmin, groupFilter, setGroupFilter, groupId, subtitle };
-}
-
-function GroupSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <select
-      aria-label="Filter by group"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${inputClass} font-medium`}
-    >
-      <option value={ALL_GROUPS}>All Groups</option>
-      {getGroups().map((g) => (
-        <option key={g.id} value={g.id}>
-          {g.name}
-        </option>
-      ))}
-    </select>
-  );
+  const group = await getGroupById(isAdmin ? requestedGroupId : user.groupId);
+  return {
+    isAdmin,
+    groupId: group?.id,
+    subtitle: isAdmin ? (group?.name ?? "All groups") : group?.name,
+  };
 }
 
 function FilterBar({ children }: { children: ReactNode }) {
@@ -100,34 +58,38 @@ function NewReportButton({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function ReportsView({
-  initialGroupId,
-  initialType,
-  initialPeriod,
+export async function ReportsView({
+  user,
+  groupId,
+  type,
+  period,
   expenses = false,
 }: {
-  initialGroupId?: string;
-  initialType?: ReportType;
-  initialPeriod?: ReportPeriod;
+  user: User;
+  groupId?: string;
+  type?: ReportType;
+  period?: ReportPeriod;
   expenses?: boolean;
 }) {
-  if (expenses || initialType || initialPeriod) {
+  const scope = await groupScope(user, groupId);
+  if (expenses || type || period) {
     return (
       <ReportsTypeList
-        key={`${expenses}-${initialType}-${initialPeriod}`}
-        initialGroupId={initialGroupId}
-        type={expenses ? "fellowship" : initialType}
-        initialPeriod={initialPeriod}
+        scope={scope}
+        type={expenses ? "fellowship" : type}
+        period={period}
         expenses={expenses}
       />
     );
   }
-  return <ReportsOverview initialGroupId={initialGroupId} />;
+  return <ReportsOverview scope={scope} />;
 }
 
-function ReportsOverview({ initialGroupId }: { initialGroupId?: string }) {
-  const { isAdmin, groupId, subtitle } = useGroupScope(initialGroupId);
-  const summaries = getReportTypeSummaries(groupId);
+type Scope = Awaited<ReturnType<typeof groupScope>>;
+
+async function ReportsOverview({ scope: { isAdmin, groupId, subtitle } }: { scope: Scope }) {
+  const summaries = await getReportTypeSummaries(groupId);
+  const group = isAdmin ? groupId : undefined;
 
   return (
     <>
@@ -139,37 +101,45 @@ function ReportsOverview({ initialGroupId }: { initialGroupId?: string }) {
 
       <div className="space-y-2.5 px-4 py-3">
         {REPORT_TYPES.map((type) => (
-          <ReportTypeCard
-            key={type}
-            kind={type}
-            summaries={summaries}
-            href={reportsHref({ type, group: isAdmin ? groupId : undefined })}
-          />
+          <ReportTypeCard key={type} kind={type} summaries={summaries} href={reportsHref({ type, group })} />
         ))}
         <ReportTypeCard
           kind="expenditure"
           summaries={summaries}
-          href={reportsHref({ expenses: true, group: isAdmin ? groupId : undefined })}
+          href={reportsHref({ expenses: true, group })}
         />
       </div>
     </>
   );
 }
 
-function ReportsTypeList({
-  initialGroupId,
+async function AdminGroupFilter({ params }: { params: ReportsParams }) {
+  const groups = await getGroups();
+  return (
+    <FilterBar>
+      <GroupSelect groups={groups.map(({ id, name }) => ({ id, name }))} params={params} />
+    </FilterBar>
+  );
+}
+
+async function ReportsTypeList({
+  scope: { isAdmin, groupId, subtitle },
   type,
-  initialPeriod,
+  period,
   expenses,
 }: {
-  initialGroupId?: string;
+  scope: Scope;
   type?: ReportType;
-  initialPeriod?: ReportPeriod;
+  period?: ReportPeriod;
   expenses: boolean;
 }) {
-  const { isAdmin, groupFilter, setGroupFilter, groupId, subtitle } = useGroupScope(initialGroupId);
-  const [period, setPeriod] = useState<ReportPeriod | undefined>(initialPeriod);
-  const reports = getReports({ groupId, type, period, withExpense: expenses });
+  const reports = await getReports({ groupId, type, period, withExpense: expenses });
+  const params: ReportsParams = {
+    type: expenses ? undefined : type,
+    period,
+    expenses,
+    group: isAdmin ? groupId : undefined,
+  };
 
   const title = expenses
     ? CARD_LABELS.expenditure
@@ -195,7 +165,7 @@ function ReportsTypeList({
       <PageHeader
         title={title}
         subtitle={subtitle}
-        backHref={reportsHref({ group: isAdmin ? groupId : undefined })}
+        backHref={reportsHref({ group: params.group })}
         action={
           !isAdmin &&
           (type ? (
@@ -206,11 +176,7 @@ function ReportsTypeList({
         }
       />
 
-      {isAdmin && (
-        <FilterBar>
-          <GroupSelect value={groupFilter} onChange={setGroupFilter} />
-        </FilterBar>
-      )}
+      {isAdmin && <AdminGroupFilter params={params} />}
 
       <div className="p-4">
         <div className="mb-3 flex items-center justify-between gap-2 px-1">
@@ -240,15 +206,15 @@ function ReportsTypeList({
               ))}
           </p>
           {period && (
-            <button
-              type="button"
-              onClick={() => setPeriod(undefined)}
+            <Link
+              href={reportsHref({ ...params, period: undefined })}
+              replace
               aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
               className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
             >
               {PERIOD_LABELS[period]}
               <XIcon width={14} height={14} />
-            </button>
+            </Link>
           )}
         </div>
         {reports.length && fellowshipListing ? (

@@ -1,16 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { compressImage, isImageFile } from "@/lib/compress-image";
+import { MAX_PHOTOS } from "@/lib/photos";
 import { CameraIcon, XIcon } from "./icons";
 
-export const MAX_PHOTOS = 3;
-
-/**
- * A photo selected on the device. In production `file` would be compressed
- * (~300-500 KB) and uploaded to Supabase Storage on submit; the UI only
- * depends on `previewUrl`.
- */
+/** A photo selected on the device, already resized for upload. */
 export interface PhotoItem {
   id: string;
   file: File;
@@ -35,12 +31,13 @@ export function usePhotoItems() {
 
   useEffect(() => () => latest.current.forEach((p) => URL.revokeObjectURL(p.previewUrl)), []);
 
-  const clear = useCallback(() => {
-    latest.current.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-    setPhotos([]);
-  }, []);
+  return { photos, setPhotos };
+}
 
-  return { photos, setPhotos, clear };
+/** Adds the selected photos to form data being sent to a Server Action. */
+export function appendPhotos(formData: FormData, field: string, photos: PhotoItem[]): FormData {
+  for (const p of photos) formData.append(field, p.file);
+  return formData;
 }
 
 export function PhotoPicker({
@@ -54,20 +51,29 @@ export function PhotoPicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const remaining = max - value.length;
 
-  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).filter(isImageFile);
     e.target.value = "";
     if (!files.length) return;
     const accepted = files.slice(0, remaining);
     const skipped = files.length - accepted.length;
-    setNotice(
-      skipped > 0
-        ? `Maximum ${max} photo${max === 1 ? "" : "s"}. ${skipped} photo${skipped === 1 ? " was" : "s were"} not added.`
-        : null,
-    );
-    onChange([...value, ...accepted.map(toPhotoItem)]);
+
+    setPreparing(true);
+    const results = await Promise.allSettled(accepted.map(compressImage));
+    setPreparing(false);
+
+    const ready = results.flatMap((r) => (r.status === "fulfilled" ? [toPhotoItem(r.value)] : []));
+    const failed = results.length - ready.length;
+    const messages = [
+      skipped > 0 &&
+        `Maximum ${max} photo${max === 1 ? "" : "s"}. ${skipped} photo${skipped === 1 ? " was" : "s were"} not added.`,
+      failed > 0 && `${failed} photo${failed === 1 ? "" : "s"} could not be read. Try a JPG or PNG.`,
+    ].filter(Boolean);
+    setNotice(messages.length ? messages.join(" ") : null);
+    onChange([...value, ...ready]);
   }
 
   function remove(id: string) {
@@ -103,24 +109,25 @@ export function PhotoPicker({
         {remaining > 0 && (
           <button
             type="button"
+            disabled={preparing}
             onClick={() => inputRef.current?.click()}
-            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/50 text-sm font-semibold text-brand-700 active:bg-brand-50"
+            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/50 text-sm font-semibold text-brand-700 active:bg-brand-50 disabled:opacity-60"
           >
             <CameraIcon />
-            Add photo
+            {preparing ? "Preparing…" : "Add photo"}
           </button>
         )}
       </div>
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
-        multiple
+        accept="image/*,.heic,.heif"
+        multiple={max > 1}
         onChange={handleFiles}
         className="hidden"
       />
       <p className="mt-2 text-xs text-slate-500">
-        {value.length} of {max} photo{max === 1 ? "" : "s"}. Prototype: photos stay on this device and are not uploaded.
+        {value.length} of {max} photo{max === 1 ? "" : "s"}.
       </p>
       {notice && (
         <p role="status" className="mt-1 text-sm font-medium text-amber-700">

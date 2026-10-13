@@ -27,8 +27,37 @@ export function toISODate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** The church is in India: "today", "this week" and "this month" follow this zone, also on UTC servers. */
+export const APP_TIME_ZONE = "Asia/Kolkata";
+
+/** Asia/Kolkata has no daylight saving time. */
+const APP_UTC_OFFSET = "+05:30";
+
+const appDateTimeFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Calendar date and wall-clock time in APP_TIME_ZONE, e.g. ["2026-10-05", "17:30:00"]. */
+function appDateTime(date: Date): [string, string] {
+  const p = Object.fromEntries(appDateTimeFormat.formatToParts(date).map((part) => [part.type, part.value]));
+  return [`${p.year}-${p.month}-${p.day}`, `${p.hour}:${p.minute}:${p.second}`];
+}
+
+/** "2026-10-05" plus `days` calendar days. */
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 export function todayISO(): string {
-  return toISODate(new Date());
+  return appDateTime(new Date())[0];
 }
 
 /** How far back a fellowship report can be dated. */
@@ -36,25 +65,37 @@ export const REPORT_BACKDATE_DAYS = 7;
 
 /** Local calendar date `days` days before today. */
 export function daysAgoISO(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return toISODate(date);
+  return addDaysISO(todayISO(), -days);
 }
 
 /** Local calendar date of this coming Sunday (today if it is Sunday). */
 export function endOfWeekISO(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + ((7 - date.getDay()) % 7));
-  return toISODate(date);
+  const today = todayISO();
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  return addDaysISO(today, (7 - weekday) % 7);
 }
 
 /** Local date-time without timezone, e.g. "2026-10-05T17:30:00". */
 export function nowLocalISO(): string {
-  const now = new Date();
-  const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
-    .map((n) => String(n).padStart(2, "0"))
-    .join(":");
-  return `${toISODate(now)}T${time}`;
+  const [date, time] = appDateTime(new Date());
+  return `${date}T${time}`;
+}
+
+/** A database timestamp as local date-time with offset, e.g. "2026-10-05T17:30:00+05:30". */
+export function toLocalDateTimeISO(timestamp: string): string {
+  const [date, time] = appDateTime(new Date(timestamp));
+  return `${date}T${time}${APP_UTC_OFFSET}`;
+}
+
+/** Start of a local calendar date as a timestamp, e.g. "2026-10-01T00:00:00+05:30". */
+export function startOfLocalDateISO(iso: string): string {
+  return `${iso.slice(0, 10)}T00:00:00${APP_UTC_OFFSET}`;
+}
+
+/** First day of the month after the one containing `iso`, e.g. "2026-10-05" -> "2026-11-01". */
+export function nextMonthISO(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
 }
 
 const rupee = new Intl.NumberFormat("en-IN", {

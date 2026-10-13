@@ -30,11 +30,6 @@ function colorFor(id: string): string {
   return PALETTE[hash % PALETTE.length];
 }
 
-/** Photos picked on the device (prototype edits) are blob: URLs that next/image can't optimise. */
-export function isLocalPreview(src: string): boolean {
-  return src.startsWith("blob:");
-}
-
 const SIZES = {
   sm: "h-10 w-10 text-sm",
   md: "h-12 w-12 text-base",
@@ -57,7 +52,8 @@ export function GroupAvatar({
           fill
           sizes="64px"
           className="object-cover"
-          unoptimized={isLocalPreview(group.photo)}
+          // Private photos need the viewer's session, which the image optimiser doesn't have.
+          unoptimized
         />
       </div>
     );

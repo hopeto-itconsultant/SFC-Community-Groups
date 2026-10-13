@@ -8,7 +8,8 @@ import type {
   Report,
   ReportType,
 } from "@/data/types";
-import { type ReportTypeSummaries, getGroupById, getUserById } from "@/lib/data-access";
+import { getGroupById, getGroups, getUserById } from "@/lib/data-access";
+import type { ReportTypeSummaries } from "@/lib/report-rules";
 import {
   CONTACT_MODES,
   NOT_AVAILABLE,
@@ -23,8 +24,12 @@ import {
 import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
-function filedByName(report: Report) {
-  return getUserById(report.filedBy)?.name ?? NOT_AVAILABLE;
+async function filedByName(report: Report): Promise<string> {
+  return (await getUserById(report.filedBy))?.name ?? NOT_AVAILABLE;
+}
+
+async function groupAndFiler(report: Report) {
+  return Promise.all([getGroupById(report.groupId), filedByName(report)]);
 }
 
 function plural(n: number, word: string) {
@@ -71,8 +76,8 @@ export function UpcomingBadge({ report }: { report: NextFellowship }) {
   );
 }
 
-export function ReportCard({ report }: { report: Report }) {
-  const group = getGroupById(report.groupId);
+export async function ReportCard({ report }: { report: Report }) {
+  const [group, filedBy] = await groupAndFiler(report);
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -93,7 +98,7 @@ export function ReportCard({ report }: { report: Report }) {
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
         <p className="min-w-0 truncate text-slate-500">
-          Filed by <span className="font-medium text-slate-700">{filedByName(report)}</span>
+          Filed by <span className="font-medium text-slate-700">{filedBy}</span>
         </p>
         <span className="flex shrink-0 items-center font-semibold text-brand-700">
           View <ChevronRightIcon width={18} height={18} />
@@ -104,8 +109,8 @@ export function ReportCard({ report }: { report: Report }) {
 }
 
 /** List item for the expenditures view: the amount and what it was spent on. */
-export function ExpenseCard({ report }: { report: FellowshipReport }) {
-  const group = getGroupById(report.groupId);
+export async function ExpenseCard({ report }: { report: FellowshipReport }) {
+  const [group, filedBy] = await groupAndFiler(report);
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -123,7 +128,7 @@ export function ExpenseCard({ report }: { report: FellowshipReport }) {
       )}
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
         <p className="min-w-0 truncate text-slate-500">
-          Filed by <span className="font-medium text-slate-700">{filedByName(report)}</span>
+          Filed by <span className="font-medium text-slate-700">{filedBy}</span>
         </p>
         <span className="flex shrink-0 items-center font-semibold text-brand-700">
           View <ChevronRightIcon width={18} height={18} />
@@ -134,8 +139,8 @@ export function ExpenseCard({ report }: { report: FellowshipReport }) {
 }
 
 /** Dense row for the all-groups fellowship listing. */
-export function FellowshipListRow({ report }: { report: FellowshipReport }) {
-  const group = getGroupById(report.groupId);
+export async function FellowshipListRow({ report }: { report: FellowshipReport }) {
+  const group = await getGroupById(report.groupId);
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -184,7 +189,8 @@ function ModeCell({ mode }: { mode: FollowUpReport["mode"] }) {
 }
 
 /** Column-aligned table of follow-ups for the all-groups view. */
-export function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
+export async function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
+  const groupNames = new Map((await getGroups({ includeClosed: true })).map((g) => [g.id, g.name]));
   return (
     <div
       role="table"
@@ -214,7 +220,7 @@ export function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
             {r.personName}
           </span>
           <span role="cell" className="truncate text-brand-700">
-            {getGroupById(r.groupId)?.name}
+            {groupNames.get(r.groupId)}
           </span>
           <span role="cell" className="whitespace-nowrap text-slate-600">
             <ModeCell mode={r.mode} />
@@ -311,8 +317,8 @@ function NextFellowshipDetail({ report }: { report: NextFellowship }) {
 }
 
 /** Full read-only view of a report; also used for the post-submit confirmation. */
-export function ReportDetail({ report }: { report: Report }) {
-  const group = getGroupById(report.groupId);
+export async function ReportDetail({ report }: { report: Report }) {
+  const [group, filedBy] = await groupAndFiler(report);
   return (
     <Card>
       <div className="flex items-start justify-between gap-2">
@@ -330,7 +336,7 @@ export function ReportDetail({ report }: { report: Report }) {
         {report.type === "follow-up" && <FollowUpDetail report={report} />}
         {report.type === "next-fellowship" && <NextFellowshipDetail report={report} />}
         <InfoRow label="Report Filed By">
-          {filedByName(report)}
+          {filedBy}
           <span className="text-slate-500"> · {formatDate(report.createdAt)}</span>
         </InfoRow>
       </dl>

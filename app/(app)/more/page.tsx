@@ -1,22 +1,15 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import { LogOutIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, Button, Card, InfoRow, SectionTitle } from "@/components/ui";
+import { signOut } from "@/lib/actions/auth";
+import { requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
+import { getGroupById } from "@/lib/data-access";
 import { ROLE_LABELS } from "@/lib/format";
-import { useCurrentUser, useSession } from "@/lib/session";
 
-export default function MorePage() {
-  const { user, group } = useCurrentUser();
-  const { logout } = useSession();
-  const router = useRouter();
-
-  function switchUser() {
-    router.replace("/login");
-    logout();
-  }
+export default async function MorePage() {
+  const user = await requireUser();
+  const group = await getGroupById(user.groupId);
 
   return (
     <>
@@ -33,21 +26,17 @@ export default function MorePage() {
           </dl>
         </Card>
 
-        <div className="mt-4">
-          <Button variant="secondary" size="lg" block onClick={switchUser}>
+        <form action={signOut} className="mt-4">
+          <Button type="submit" variant="secondary" size="lg" block>
             <LogOutIcon width={20} height={20} />
-            Switch demo user
+            Sign out
           </Button>
-        </div>
+        </form>
 
         <SectionTitle>About</SectionTitle>
         <Card className="space-y-2 text-sm text-slate-600">
           <p className="font-semibold text-slate-900">{APP_NAME}</p>
-          <p>
-            This is a UI prototype. Reports shown are sample data, and anything you submit is
-            shown back to you but not saved.
-          </p>
-          <p>Photos you select stay on your phone and are not uploaded.</p>
+          <p>Reports and photos are saved securely and shared only with your group&apos;s leaders and the Admin.</p>
         </Card>
       </div>
     </>

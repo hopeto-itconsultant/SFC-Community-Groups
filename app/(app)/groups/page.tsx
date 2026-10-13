@@ -1,51 +1,58 @@
-"use client";
-
-import { useState } from "react";
 import { GroupDetailCard, GroupListItem } from "@/components/groups";
 import { PlusIcon } from "@/components/icons";
-import { PageHeader } from "@/components/PageHeader";
 import { RoleGate } from "@/components/RoleGate";
-import { Button, LinkButton } from "@/components/ui";
-import { ViewToggle, useStoredView } from "@/components/ViewToggle";
+import { LinkButton } from "@/components/ui";
+import { ViewSwitch } from "@/components/ViewToggle";
 import { getClosedGroupCount, getGroups } from "@/lib/data-access";
 
-export default function GroupsPage() {
-  const [showClosed, setShowClosed] = useState(false);
-  const groups = getGroups({ includeClosed: showClosed });
-  const closedCount = getClosedGroupCount();
-  const [view, setView] = useStoredView("sfc.groupsView");
-
+export default async function GroupsPage({ searchParams }: PageProps<"/groups">) {
+  const { closed } = await searchParams;
   return (
     <RoleGate allow={["admin"]}>
-      <PageHeader
+      <GroupsList showClosed={closed === "1"} />
+    </RoleGate>
+  );
+}
+
+async function GroupsList({ showClosed }: { showClosed: boolean }) {
+  const [groups, closedCount] = await Promise.all([
+    getGroups({ includeClosed: showClosed }),
+    getClosedGroupCount(),
+  ]);
+
+  return (
+    <>
+      <ViewSwitch
+        storageKey="sfc.groupsView"
         title="Community Groups"
         subtitle={`${groups.length} groups`}
-        action={<ViewToggle view={view} onChange={setView} />}
+        placement="page"
+        cards={
+          <div className="grid grid-cols-2 gap-3 p-4">
+            {groups.map((g) => (
+              <GroupDetailCard key={g.id} group={g} />
+            ))}
+          </div>
+        }
+        list={
+          <div className="space-y-2 p-4">
+            {groups.map((g) => (
+              <GroupListItem key={g.id} group={g} />
+            ))}
+          </div>
+        }
       />
-      {view === "cards" ? (
-        <div className="grid grid-cols-2 gap-3 p-4">
-          {groups.map((g) => (
-            <GroupDetailCard key={g.id} group={g} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2 p-4">
-          {groups.map((g) => (
-            <GroupListItem key={g.id} group={g} />
-          ))}
-        </div>
-      )}
       <div className="space-y-2 px-4 pb-4">
         {closedCount > 0 && (
-          <Button variant="ghost" block onClick={() => setShowClosed((v) => !v)}>
+          <LinkButton href={showClosed ? "/groups" : "/groups?closed=1"} variant="ghost" block replace>
             {showClosed ? "Hide closed groups" : `Show closed groups (${closedCount})`}
-          </Button>
+          </LinkButton>
         )}
         <LinkButton href="/groups/new" variant="secondary" block>
           <PlusIcon width={18} height={18} />
           Add group
         </LinkButton>
       </div>
-    </RoleGate>
+    </>
   );
 }

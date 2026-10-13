@@ -17,18 +17,17 @@ export interface User extends Person {
   role: Role;
   /** Required for leaders and asst. leaders, absent for admins. */
   groupId?: string;
-  /** Accounts that exist only to demo a role, not real people. */
-  isDemo?: boolean;
 }
 
 export interface CommunityGroup {
   id: string;
   name: string;
   category?: string;
-  frequency: Frequency;
+  /** Informational only; may be missing. */
+  frequency?: Frequency;
   leaderIds: string[];
   assistantLeaderIds: string[];
-  /** Path under /public, e.g. "/groups/womens-cg.jpg". */
+  /** Image URL, e.g. "/photos/group-photos/<group id>/<file>". */
   photo?: string;
   /** Closed groups are kept, with their reports, instead of being deleted. Missing means active. */
   status?: GroupStatus;
