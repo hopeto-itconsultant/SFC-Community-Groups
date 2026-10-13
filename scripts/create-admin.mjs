@@ -6,8 +6,8 @@
 import { createClient } from "@supabase/supabase-js";
 import readline from "node:readline/promises";
 import { Writable } from "node:stream";
+import { MOBILE_PATTERN, loginEmailForMobile, normalizeMobile } from "../lib/login-id.ts";
 
-const MOBILE_PATTERN = /^\+[1-9][0-9]{6,14}$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -52,7 +52,7 @@ async function askPassword(prompt) {
 
 console.log(`Creating the first Admin for ${url}`);
 const name = (await rl.question("Full name: ")).trim();
-const mobile = (await rl.question("Mobile number with country code (e.g. +919876543210): ")).replace(/[\s-]/g, "");
+const mobile = normalizeMobile(await rl.question("Mobile number with country code (e.g. +919876543210): "));
 const password = await askPassword(`Password (at least ${MIN_PASSWORD_LENGTH} characters): `);
 const confirmation = await askPassword("Confirm password: ");
 rl.close();
@@ -63,9 +63,9 @@ if (password.length < MIN_PASSWORD_LENGTH) fail(`Password must be at least ${MIN
 if (password !== confirmation) fail("Passwords do not match.");
 
 const { data: created, error: createError } = await supabase.auth.admin.createUser({
-  phone: mobile,
+  email: loginEmailForMobile(mobile),
   password,
-  phone_confirm: true,
+  email_confirm: true,
 });
 if (createError) fail(`Creating the login: ${createError.message}`);
 
