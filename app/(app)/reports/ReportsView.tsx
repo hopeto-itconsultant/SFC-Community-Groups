@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import type { FellowshipReport, FollowUpReport, ReportType } from "@/data/types";
+import type { FellowshipReport, FollowUpReport, Report, ReportType } from "@/data/types";
 import { inputClass } from "@/components/form";
 import { PlusIcon, XIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +13,9 @@ import {
   ReportCard,
   ReportTypeCard,
 } from "@/components/reports";
+import { ReportCalendar } from "@/components/ReportCalendar";
 import { EmptyState, LinkButton } from "@/components/ui";
+import { ReportLayoutToggle, useStoredReportLayout } from "@/components/ViewToggle";
 import {
   type ReportPeriod,
   getGroupById,
@@ -87,6 +89,47 @@ function FilterBar({ children }: { children: ReactNode }) {
   return (
     <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur">
       {children}
+    </div>
+  );
+}
+
+function ReportCollection({
+  reports,
+  expenses,
+  fellowshipListing,
+  followUpTable,
+}: {
+  reports: Report[];
+  expenses: boolean;
+  fellowshipListing: boolean;
+  followUpTable: boolean;
+}) {
+  const fellowshipReports = reports.filter((r): r is FellowshipReport => r.type === "fellowship");
+  const followUpReports = reports.filter((r): r is FollowUpReport => r.type === "follow-up");
+
+  if (fellowshipListing) {
+    return (
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+        {fellowshipReports.map((r) => (
+          <FellowshipListRow key={r.id} report={r} />
+        ))}
+      </div>
+    );
+  }
+
+  if (followUpTable) {
+    return <FollowUpTable reports={followUpReports} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {reports.map((r) =>
+        expenses && r.type === "fellowship" ? (
+          <ExpenseCard key={r.id} report={r} />
+        ) : (
+          <ReportCard key={r.id} report={r} />
+        ),
+      )}
     </div>
   );
 }
@@ -169,6 +212,7 @@ function ReportsTypeList({
 }) {
   const { isAdmin, groupFilter, setGroupFilter, groupId, subtitle } = useGroupScope(initialGroupId);
   const [period, setPeriod] = useState<ReportPeriod | undefined>(initialPeriod);
+  const [layout, setLayout] = useStoredReportLayout("sfc.reportsLayout");
   const reports = getReports({ groupId, type, period, withExpense: expenses });
 
   const title = expenses
@@ -214,7 +258,7 @@ function ReportsTypeList({
 
       <div className="p-4">
         <div className="mb-3 flex items-center justify-between gap-2 px-1">
-          <p className="text-sm text-slate-500">
+          <p className="min-w-0 flex-1 text-sm text-slate-500">
             {reports.length} report{reports.length === 1 ? "" : "s"}
             {expenses && (
               <>
@@ -239,42 +283,47 @@ function ReportsTypeList({
                 </span>
               ))}
           </p>
-          {period && (
-            <button
-              type="button"
-              onClick={() => setPeriod(undefined)}
-              aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
-            >
-              {PERIOD_LABELS[period]}
-              <XIcon width={14} height={14} />
-            </button>
-          )}
-        </div>
-        {reports.length && fellowshipListing ? (
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-            {fellowshipReports.map((r) => (
-              <FellowshipListRow key={r.id} report={r} />
-            ))}
-          </div>
-        ) : reports.length && followUpTable ? (
-          <FollowUpTable reports={followUpReports} />
-        ) : reports.length ? (
-          <div className="space-y-3">
-            {reports.map((r) =>
-              expenses && r.type === "fellowship" ? (
-                <ExpenseCard key={r.id} report={r} />
-              ) : (
-                <ReportCard key={r.id} report={r} />
-              ),
+          <div className="flex shrink-0 items-center gap-2">
+            {period && (
+              <button
+                type="button"
+                onClick={() => setPeriod(undefined)}
+                aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
+                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
+              >
+                {PERIOD_LABELS[period]}
+                <XIcon width={14} height={14} />
+              </button>
             )}
+            <ReportLayoutToggle view={layout} onChange={setLayout} />
           </div>
-        ) : (
+        </div>
+        {reports.length === 0 ? (
           <EmptyState
             title="No reports found"
             description={
               period || (isAdmin && groupId) ? "Try a different filter." : "Nothing has been filed yet."
             }
+          />
+        ) : layout === "calendar" ? (
+          <ReportCalendar
+            key={`${groupId ?? "all"}-${type ?? "all"}-${period ?? "any"}-${expenses}`}
+            reports={reports}
+            renderDay={(dayReports) => (
+              <ReportCollection
+                reports={dayReports}
+                expenses={expenses}
+                fellowshipListing={fellowshipListing}
+                followUpTable={followUpTable}
+              />
+            )}
+          />
+        ) : (
+          <ReportCollection
+            reports={reports}
+            expenses={expenses}
+            fellowshipListing={fellowshipListing}
+            followUpTable={followUpTable}
           />
         )}
       </div>
