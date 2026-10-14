@@ -98,7 +98,7 @@ function inPeriod(report: Report, period: ReportPeriod | undefined): boolean {
   }
 }
 
-/** Reports sorted newest first by the date they are about. */
+/** Reports sorted latest date to oldest by the date they are about. */
 export function getReports({ groupId, type, period, withExpense }: ReportQuery = {}): Report[] {
   return reports
     .filter(
@@ -122,7 +122,7 @@ export function getLastFellowship(groupId: string): FellowshipReport | undefined
   );
 }
 
-/** Upcoming planned fellowships (today or later), soonest first. */
+/** Upcoming plans only (today or later, not cancelled), first date through the last date. Past plans are omitted. */
 export function getUpcomingFellowships(groupId?: string): NextFellowship[] {
   return getReports({ groupId, period: "upcoming" })
     .filter((r): r is NextFellowship => r.type === "next-fellowship")
