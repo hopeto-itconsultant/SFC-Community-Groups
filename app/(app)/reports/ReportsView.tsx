@@ -20,6 +20,7 @@ import {
   getGroups,
   getReportTypeSummaries,
   getReports,
+  getUpcomingFellowships,
 } from "@/lib/data-access";
 import { CONTACT_MODES, formatRupees } from "@/lib/format";
 import { useCurrentUser } from "@/lib/session";
@@ -169,7 +170,12 @@ function ReportsTypeList({
 }) {
   const { isAdmin, groupFilter, setGroupFilter, groupId, subtitle } = useGroupScope(initialGroupId);
   const [period, setPeriod] = useState<ReportPeriod | undefined>(initialPeriod);
-  const reports = getReports({ groupId, type, period, withExpense: expenses });
+  // Next-fellowship plans are upcoming only, first date through the last date.
+  // Fellowship reports stay latest date through the oldest date.
+  const reports =
+    type === "next-fellowship"
+      ? getUpcomingFellowships(groupId)
+      : getReports({ groupId, type, period, withExpense: expenses });
 
   const title = expenses
     ? CARD_LABELS.expenditure
@@ -239,7 +245,7 @@ function ReportsTypeList({
                 </span>
               ))}
           </p>
-          {period && (
+          {period && type !== "next-fellowship" && (
             <button
               type="button"
               onClick={() => setPeriod(undefined)}
@@ -273,7 +279,11 @@ function ReportsTypeList({
           <EmptyState
             title="No reports found"
             description={
-              period || (isAdmin && groupId) ? "Try a different filter." : "Nothing has been filed yet."
+              type === "next-fellowship"
+                ? "No upcoming fellowship planned."
+                : period || (isAdmin && groupId)
+                  ? "Try a different filter."
+                  : "Nothing has been filed yet."
             }
           />
         )}
