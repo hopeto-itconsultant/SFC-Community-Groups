@@ -21,6 +21,7 @@ import {
   formatShortDate,
   todayISO,
 } from "@/lib/format";
+import { photoVariant } from "@/lib/photos";
 import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
@@ -81,7 +82,8 @@ export async function ReportCard({ report }: { report: Report }) {
   return (
     <Link
       href={`/reports/${report.id}`}
-      className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -114,7 +116,8 @@ export async function ExpenseCard({ report }: { report: FellowshipReport }) {
   return (
     <Link
       href={`/reports/${report.id}`}
-      className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -144,6 +147,7 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
   return (
     <Link
       href={`/reports/${report.id}`}
+      prefetch={false}
       className="flex items-center gap-2 px-3 py-2.5 active:bg-slate-50"
     >
       <div className="min-w-0 flex-1">
@@ -210,6 +214,7 @@ export async function FollowUpTable({ reports }: { reports: FollowUpReport[] }) 
         <Link
           key={r.id}
           href={`/reports/${r.id}`}
+          prefetch={false}
           role="row"
           className={`${FOLLOW_UP_COLS} px-3 py-2 text-sm active:bg-slate-50`}
         >
@@ -258,7 +263,14 @@ function PhotoGrid({ photos }: { photos: string[] }) {
           rel="noreferrer"
           className="relative block aspect-square overflow-hidden rounded-xl bg-slate-100"
         >
-          <Image src={src} alt={`Photo ${i + 1}`} fill sizes="33vw" className="object-cover" unoptimized />
+          <Image
+            src={photoVariant(src, 384)}
+            alt={`Photo ${i + 1}`}
+            fill
+            sizes="33vw"
+            className="object-cover"
+            unoptimized
+          />
         </a>
       ))}
     </div>
@@ -349,7 +361,8 @@ export function NextFellowshipSummary({ report }: { report: NextFellowship }) {
   return (
     <Link
       href={`/reports/${report.id}`}
-      className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center gap-2 text-lg font-bold">
         <CalendarIcon className="text-brand-700" />
@@ -488,6 +501,7 @@ export function ReportTypeCard({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="block rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center gap-2.5">
@@ -512,7 +526,8 @@ export function LastFellowshipSummary({ report }: { report: FellowshipReport }) 
   return (
     <Link
       href={`/reports/${report.id}`}
-      className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center justify-between">
         <p className="text-lg font-bold">{formatDate(report.date)}</p>

@@ -49,6 +49,6 @@ Everyone signs in with their mobile number and a password; there are no SMS code
 
 ## Your assets
 
-- **Logo:** replace `public/brand/logo.jpg` (or change `LOGO_SRC` in `lib/brand.ts`).
+- **Logo:** replace `public/brand/logo.webp` (or change `LOGO_SRC` in `lib/brand.ts`), plus the `icon-32.png` and `apple-touch-icon.png` icons next to it.
 - **Group photos:** upload them in the app (Edit Group). `public/groups/` only holds the photos used by `npm run import-groups`.
 - **HEIC photos (iPhone):** the app converts them on upload. For `public/groups/`, run `npm run images` to convert `.heic` files there to JPGs.

@@ -9,6 +9,7 @@ import {
   getNextFellowship,
 } from "@/lib/data-access";
 import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDate } from "@/lib/format";
+import { photoVariant } from "@/lib/photos";
 import { isGroupClosed } from "@/lib/report-rules";
 import { GroupAvatar } from "./GroupAvatar";
 import { ChevronRightIcon } from "./icons";
@@ -56,6 +57,7 @@ export function StatCard({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="flex flex-col justify-between rounded-2xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       {body}
@@ -88,7 +90,8 @@ export async function GroupMiniCard({ group }: { group: CommunityGroup }) {
   return (
     <Link
       href={`/groups/${group.id}`}
-      className="block rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-start justify-between gap-1">
         <GroupAvatar group={group} size="sm" />
@@ -124,12 +127,13 @@ export async function GroupDetailCard({ group }: { group: CommunityGroup }) {
   return (
     <Link
       href={`/groups/${group.id}`}
-      className="block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="relative flex aspect-[16/9] items-center justify-center bg-slate-50">
         {group.photo ? (
           <Image
-            src={group.photo}
+            src={photoVariant(group.photo, 384)}
             alt=""
             fill
             sizes="(max-width: 576px) 50vw, 288px"
@@ -180,6 +184,7 @@ export async function GroupSummaryRow({ group }: { group: CommunityGroup }) {
   return (
     <Link
       href={`/groups/${group.id}`}
+      prefetch={false}
       className="flex items-center gap-3 px-3 py-2.5 active:bg-slate-50"
     >
       <GroupAvatar group={group} size="sm" />
@@ -205,7 +210,8 @@ export async function GroupListItem({ group }: { group: CommunityGroup }) {
   return (
     <Link
       href={`/groups/${group.id}`}
-      className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      prefetch={false}
+      className="cv-item flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <GroupAvatar group={group} />
       <div className="min-w-0 flex-1">

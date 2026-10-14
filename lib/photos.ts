@@ -20,3 +20,12 @@ export const PHOTO_TYPES: Record<string, string> = {
 export function photoUrl(bucket: PhotoBucket, path: string): string {
   return `/photos/${bucket}/${path}`;
 }
+
+/** Shortest-edge sizes app/photos can scale to, so lists don't download full-size photos. */
+export const PHOTO_VARIANTS = [192, 384] as const;
+export type PhotoVariant = (typeof PHOTO_VARIANTS)[number];
+
+/** A smaller copy of a stored photo. Other sources, such as local previews, are returned unchanged. */
+export function photoVariant(src: string, size: PhotoVariant): string {
+  return src.startsWith("/photos/") ? `${src}?w=${size}` : src;
+}

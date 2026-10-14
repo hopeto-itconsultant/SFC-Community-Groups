@@ -31,7 +31,7 @@ function Hero({ user, subtitle }: { user: User; subtitle?: string }) {
   return (
     <div className="bg-brand-700 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white">
       <div className="flex items-center gap-2 text-sm font-semibold text-brand-100">
-        <Image src={LOGO_SRC} alt="" width={24} height={24} className="rounded-md ring-1 ring-white/30" />
+        <Image src={LOGO_SRC} alt="" width={24} height={24} unoptimized className="rounded-md ring-1 ring-white/30" />
         {APP_NAME}
       </div>
       <h1 className="mt-3 truncate text-base font-semibold leading-tight">
@@ -144,7 +144,7 @@ function StatusRow({
   badge?: ReactNode;
 }) {
   return (
-    <Link href={href} className="flex items-center gap-3 px-3 py-2.5 active:bg-slate-50">
+    <Link href={href} prefetch={false} className="flex items-center gap-3 px-3 py-2.5 active:bg-slate-50">
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
         aria-hidden="true"
@@ -239,6 +239,7 @@ async function LeaderHome({ user, group }: { user: User; group: CommunityGroup }
             <Link
               key={a.href}
               href={a.href}
+              prefetch={false}
               className="flex flex-col items-center gap-1.5 rounded-2xl bg-white px-2 py-3 text-center shadow-sm ring-1 ring-slate-200/70 active:bg-brand-50"
             >
               <span

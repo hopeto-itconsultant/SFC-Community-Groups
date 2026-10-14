@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { CommunityGroup } from "@/data/types";
+import { photoVariant } from "@/lib/photos";
 
 const PALETTE = [
   "bg-rose-100 text-rose-700",
@@ -47,7 +48,7 @@ export function GroupAvatar({
     return (
       <div className={`relative shrink-0 overflow-hidden rounded-xl ${SIZES[size]}`}>
         <Image
-          src={group.photo}
+          src={photoVariant(group.photo, 192)}
           alt={group.name}
           fill
           sizes="64px"

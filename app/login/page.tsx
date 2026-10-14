@@ -11,7 +11,15 @@ export default async function LoginPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-8 flex flex-col items-center text-center">
-        <Image src={LOGO_SRC} alt="" width={80} height={80} priority className="rounded-2xl shadow-sm" />
+        <Image
+          src={LOGO_SRC}
+          alt=""
+          width={80}
+          height={80}
+          priority
+          unoptimized
+          className="rounded-2xl shadow-sm"
+        />
         <h1 className="mt-4 text-2xl font-bold">{APP_NAME}</h1>
         <p className="mt-1 text-slate-500">Management &amp; Reporting</p>
       </div>
