@@ -140,7 +140,8 @@ export async function returnToAdmin(): Promise<void> {
   if (!admin || admin.role !== "admin") redirect("/home");
   await clearLoginAsProfileId();
   revalidatePath("/", "layout");
-  redirect("/people");
+  // Banner only shows when SUPERADMIN is on; still clear the cookie if the flag was turned off.
+  redirect(SUPERADMIN ? "/people" : "/home");
 }
 
 /** Saves whether titles such as "Bro." show before names on the signed-in person's own screens. */
