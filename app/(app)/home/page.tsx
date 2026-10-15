@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { CommunityGroup, CurrentUser } from "@/data/types";
 import { GroupMiniCard, GroupSummaryRow, StatCard } from "@/components/groups";
 import { CalendarIcon, ChevronRightIcon, FileTextIcon } from "@/components/icons";
+import { InstallBanner } from "@/components/InstallBanner";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
 import { ViewSwitch } from "@/components/ViewToggle";
 import { requireUser } from "@/lib/auth";
@@ -82,6 +83,7 @@ async function AdminHome({ user }: { user: CurrentUser }) {
             href="/reports?type=next-fellowship&period=upcoming"
           />
         </div>
+        <InstallBanner className="mt-3" />
 
         {groups.length ? (
           <ViewSwitch
@@ -124,6 +126,7 @@ function NoGroupHome({ user }: { user: CurrentUser }) {
     <>
       <Hero user={user} />
       <div className="p-4">
+        <InstallBanner className="mb-3" />
         <EmptyState
           title="You're not assigned to a group yet"
           description="Please ask the Admin to add you to your community group."
@@ -241,6 +244,7 @@ async function LeaderHome({ user, group }: { user: CurrentUser; group: Community
             href="/reports?view=expenses&period=this-month"
           />
         </div>
+        <InstallBanner className="mt-3" />
 
         <SectionTitle>New Report</SectionTitle>
         <div className="grid grid-cols-3 gap-2">

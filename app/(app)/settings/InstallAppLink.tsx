@@ -1,62 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ChevronRightIcon } from "@/components/icons";
-import { canPromptInstall, promptInstall } from "@/lib/pwa-install";
-
-function runningInstalled() {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
-function isIos() {
-  const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
-function manualInstallNote() {
-  if (isIos()) return "Share, then Add to Home Screen.";
-  return "Use the browser menu to install.";
-}
+import { useInstallApp } from "@/lib/use-install-app";
 
 export function InstallAppLink() {
-  const [installed, setInstalled] = useState(false);
-  const [canInstall, setCanInstall] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (runningInstalled()) {
-      setInstalled(true);
-      return;
-    }
-
-    const sync = () => setCanInstall(canPromptInstall());
-    sync();
-    if (!canPromptInstall() && isIos()) setNote(manualInstallNote());
-
-    const onAvailable = () => setCanInstall(true);
-    const onInstalled = () => setInstalled(true);
-    window.addEventListener("pwa-install-available", onAvailable);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("pwa-install-available", onAvailable);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
+  const { installed, canInstall, note, install } = useInstallApp();
 
   if (installed) return null;
-
-  async function onInstall() {
-    const outcome = await promptInstall();
-    if (outcome === "accepted") {
-      setInstalled(true);
-      return;
-    }
-    setNote(manualInstallNote());
-    setCanInstall(canPromptInstall());
-  }
 
   const detail = !canInstall && note ? note : "Add to your home screen";
 
@@ -64,7 +14,7 @@ export function InstallAppLink() {
     <div className="mt-3">
       <button
         type="button"
-        onClick={onInstall}
+        onClick={install}
         className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
       >
         <span className="min-w-0 flex-1">
