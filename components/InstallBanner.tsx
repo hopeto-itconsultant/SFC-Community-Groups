@@ -5,7 +5,9 @@ import { useSyncExternalStore } from "react";
 import { useInstallApp } from "@/lib/use-install-app";
 import { XIcon } from "./icons";
 
-const DISMISS_KEY = "sfc.installBannerDismissed";
+// Kept in memory, not sessionStorage: mobile browsers restore sessionStorage with the tab,
+// so a dismissal there would outlive closing and reopening the app.
+let dismissedThisLoad = false;
 
 const listeners = new Set<() => void>();
 
@@ -15,7 +17,7 @@ function subscribe(listener: () => void) {
 }
 
 function dismiss() {
-  window.sessionStorage.setItem(DISMISS_KEY, "1");
+  dismissedThisLoad = true;
   listeners.forEach((l) => l());
 }
 
@@ -24,8 +26,8 @@ export function InstallBanner({ className = "" }: { className?: string }) {
   const { installed, canInstall, ios, install } = useInstallApp();
   const dismissed = useSyncExternalStore(
     subscribe,
-    () => window.sessionStorage.getItem(DISMISS_KEY) === "1",
-    () => true,
+    () => dismissedThisLoad,
+    () => false,
   );
 
   if (installed || dismissed || !(canInstall || ios)) return null;

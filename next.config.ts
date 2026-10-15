@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The /guide route reads these PDFs from disk. Include them in the server bundle.
+  outputFileTracingIncludes: {
+    "/guide": [
+      "./docs/SFC CG Leader Guide.pdf",
+      "./docs/SFC CGs Admin Guide.pdf",
+    ],
+  },
   // Lets phones on the home network load dev assets from http://192.168.x.x:3000.
   allowedDevOrigins: ["192.168.*.*"],
   async headers() {
