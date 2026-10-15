@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { type ComponentType, type SVGProps, useEffect, useState } from "react";
 import type { Role } from "@/data/types";
 import { isConstrainedNetwork } from "@/lib/network";
-import { FileTextIcon, GridIcon, HomeIcon, MenuIcon, UsersIcon } from "./icons";
+import { FileTextIcon, GridIcon, HomeIcon, SettingsIcon, UsersIcon } from "./icons";
 
 interface NavItem {
   href: string;
@@ -19,14 +19,14 @@ const LEADER_NAV: NavItem[] = [
   { href: "/home", label: "Home", icon: HomeIcon, also: ["/new"] },
   { href: "/group", label: "My Group", icon: UsersIcon },
   { href: "/reports", label: "Reports", icon: FileTextIcon },
-  { href: "/more", label: "More", icon: MenuIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/home", label: "Home", icon: HomeIcon },
   { href: "/groups", label: "Groups", icon: GridIcon },
   { href: "/reports", label: "Reports", icon: FileTextIcon },
-  { href: "/more", label: "More", icon: MenuIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 function matches(pathname: string, prefix: string) {

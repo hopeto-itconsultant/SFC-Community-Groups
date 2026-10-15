@@ -112,31 +112,46 @@ export type Database = {
           active: boolean
           auth_user_id: string | null
           created_at: string
+          date_of_birth: string | null
+          email: string | null
           id: string
           is_admin: boolean
           mobile: string | null
           name: string
+          serving_since: string | null
+          show_salutations: boolean | null
           updated_at: string
+          username: string | null
         }
         Insert: {
           active?: boolean
           auth_user_id?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null
           name: string
+          serving_since?: string | null
+          show_salutations?: boolean | null
           updated_at?: string
+          username?: string | null
         }
         Update: {
           active?: boolean
           auth_user_id?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null
           name?: string
+          serving_since?: string | null
+          show_salutations?: boolean | null
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -239,10 +254,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_leader_details: { Args: { target_id: string }; Returns: boolean }
+      can_edit_report: {
+        Args: {
+          p_group_id: string
+          p_report_id: string
+          p_type: Database["public"]["Enums"]["report_type"]
+        }
+        Returns: boolean
+      }
       current_profile_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_group_member: { Args: { group_id: string }; Returns: boolean }
+      report_is_latest: { Args: { p_report_id: string }; Returns: boolean }
       report_type_summaries: { Args: { p_group_id?: string }; Returns: Json }
+      set_show_salutations: { Args: { show: boolean }; Returns: undefined }
       storage_group_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {

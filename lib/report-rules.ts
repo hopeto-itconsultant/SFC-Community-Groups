@@ -1,6 +1,15 @@
 // Pure rules and query shapes shared by the mock layer (data-access) and the
 // Supabase layer (queries). Nothing here looks data up.
-import type { CommunityGroup, ContactMode, NextFellowship, Report, ReportType, User } from "@/data/types";
+import type {
+  CommunityGroup,
+  ContactMode,
+  FellowshipReport,
+  FollowUpReport,
+  NextFellowship,
+  Report,
+  ReportType,
+  User,
+} from "@/data/types";
 import { todayISO } from "./format";
 
 export function isGroupClosed(group: CommunityGroup): boolean {
@@ -17,6 +26,22 @@ export function canEditPlan(user: User, plan: NextFellowship): boolean {
   return (user.role === "admin" || user.groupId === plan.groupId) && isUpcomingPlan(plan);
 }
 
+/**
+ * The latest fellowship or follow-up for the group. A leader needs an active
+ * group. An admin may still correct that latest report after the group is closed.
+ * `isLatest` is looked up by the caller; this function does not read the database.
+ */
+export function canEditFiledReport(
+  user: User,
+  report: FellowshipReport | FollowUpReport,
+  group: CommunityGroup,
+  isLatest: boolean,
+): boolean {
+  if (!isLatest || group.id !== report.groupId) return false;
+  if (user.role === "admin") return true;
+  return user.groupId === report.groupId && !isGroupClosed(group);
+}
+
 export function isUpcomingPlan(plan: NextFellowship): boolean {
   return !plan.cancelledAt && plan.proposedDate >= todayISO();
 }
@@ -24,6 +49,22 @@ export function isUpcomingPlan(plan: NextFellowship): boolean {
 /** The calendar date a report is about (fellowship date, follow-up date or proposed date). */
 export function getReportDate(report: Report): string {
   return report.type === "next-fellowship" ? report.proposedDate : report.date;
+}
+
+/**
+ * Uncancelled plans dated today or earlier that still have no fellowship report.
+ * One plan per date — the newest — with the newest date first.
+ */
+export function fileableFellowshipPlans(plans: NextFellowship[], filedDates: Iterable<string>): NextFellowship[] {
+  const filed = new Set(filedDates);
+  const today = todayISO();
+  const newestByDate = new Map<string, NextFellowship>();
+  for (const plan of plans) {
+    if (plan.cancelledAt || plan.proposedDate > today || filed.has(plan.proposedDate)) continue;
+    const current = newestByDate.get(plan.proposedDate);
+    if (!current || plan.createdAt > current.createdAt) newestByDate.set(plan.proposedDate, plan);
+  }
+  return [...newestByDate.values()].sort((a, b) => b.proposedDate.localeCompare(a.proposedDate));
 }
 
 /** "this-month": filed this calendar month. "upcoming": uncancelled next-fellowship plans dated today or later. */

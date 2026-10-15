@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { REMEMBER_COOKIE, applyRememberMe, remembersSession } from "@/lib/supabase/remember";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/manifest.webmanifest", "/sw.js"];
 
 /**
  * Refreshes the Supabase session cookie on every request and sends signed-out
@@ -10,6 +11,8 @@ const PUBLIC_PATHS = ["/login"];
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  const remember = remembersSession(request.cookies.get(REMEMBER_COOKIE)?.value);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,9 +23,10 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet, headers) {
-          for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
+          const toSet = applyRememberMe(cookiesToSet, remember);
+          for (const { name, value } of toSet) request.cookies.set(name, value);
           response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
+          for (const { name, value, options } of toSet) response.cookies.set(name, value, options);
           for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);
         },
       },
@@ -42,5 +46,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Lets phones on the home network load dev assets from http://192.168.x.x:3000.
+  allowedDevOrigins: ["192.168.*.*"],
   async headers() {
     return [
       {
@@ -9,6 +11,9 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
       },
     ];
+  },
+  async redirects() {
+    return [{ source: "/more", destination: "/settings", permanent: false }];
   },
   experimental: {
     serverActions: {

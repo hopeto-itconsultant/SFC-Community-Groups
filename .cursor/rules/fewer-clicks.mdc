@@ -1,0 +1,38 @@
+---
+description: Prefer the control that finishes an action in the fewest taps
+alwaysApply: true
+---
+
+# Fewer taps
+
+Screens are used on a phone. If two controls can do the same job, use the one that takes fewer taps.
+
+## Choices
+
+- A dropdown (`select`) takes two taps: open it, then pick. For a short fixed list (2–4 options), use `ChoiceField` so one tap selects it.
+- Keep a dropdown only when the list is long enough that buttons would make people scroll (countries, many groups).
+- A yes/no or on/off choice is a tap on the option itself, not a dropdown.
+
+```tsx
+// Bad — two taps for two options
+<Field label="Role" required>
+  <select name="role" defaultValue="leader">
+    <option value="leader">Leader</option>
+    <option value="asst-leader">Asst. Leader</option>
+  </select>
+</Field>
+
+// Good — one tap
+<ChoiceField
+  label="Role"
+  name="role"
+  required
+  options={GROUP_ROLE_OPTIONS}
+  defaultValue="leader"
+/>
+```
+
+## Extra steps
+
+- Do not add a menu, confirm screen, or second page when one control on the current screen can finish the action.
+- Do not make people open something, then choose, when the choices fit on the screen.

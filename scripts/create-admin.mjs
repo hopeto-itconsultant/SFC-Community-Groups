@@ -1,12 +1,13 @@
-// Creates the first Admin: a login (mobile number + password) and a linked
-// profile. Run once per database; it refuses to run if an Admin already exists.
+// Creates the first Admin: a username login and a linked profile. Name and
+// mobile number are optional. A mobile number can also be used to sign in.
+// Run once per database; it refuses to run if an Admin already exists.
 // Later accounts are created by the Admin inside the app.
 //
 // Usage: npm run create-admin   (reads .env.local)
 import { createClient } from "@supabase/supabase-js";
 import readline from "node:readline/promises";
 import { Writable } from "node:stream";
-import { loginEmailForMobile, normalizeMobile } from "../lib/login-id.ts";
+import { USERNAME_RULE, loginEmailForUsername, normalizeMobile, normalizeUsername } from "../lib/login-id.ts";
 import { MIN_PASSWORD_LENGTH, passwordProblem } from "../lib/passwords.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,10 +55,14 @@ async function askPassword(prompt) {
 }
 
 console.log(`Creating the first Admin for ${url}`);
-const name = (await rl.question("Full name: ")).trim();
-if (!name) fail("Name is required.");
-const mobile = normalizeMobile(await rl.question("Mobile number (e.g. 9876543210 or 919876543210): "));
-if (!mobile) fail("Enter a mobile number: 10 digits, or the country code followed by the number.");
+const username = normalizeUsername(await rl.question("Username: "));
+if (!username) fail(USERNAME_RULE);
+const nameInput = (await rl.question("Name (optional): ")).trim();
+if (nameInput.length > 100) fail("Use a shorter name.");
+const name = nameInput || username;
+const mobileInput = (await rl.question("Mobile number (optional, e.g. 9876543210): ")).trim();
+const mobile = mobileInput ? normalizeMobile(mobileInput) : null;
+if (mobileInput && !mobile) fail("Enter a mobile number: 10 digits, or the country code followed by the number.");
 const password = await askPassword(`Password (at least ${MIN_PASSWORD_LENGTH} characters): `);
 const confirmation = await askPassword("Confirm password: ");
 rl.close();
@@ -66,8 +71,25 @@ const problem = passwordProblem(password);
 if (problem) fail(problem);
 if (password !== confirmation) fail("Passwords do not match.");
 
+const { data: takenUsername, error: usernameError } = await supabase
+  .from("profiles")
+  .select("name")
+  .eq("username", username)
+  .maybeSingle();
+if (usernameError) fail(`Checking the username: ${usernameError.message}`);
+if (takenUsername) fail(`${username} is already used by ${takenUsername.name}.`);
+if (mobile) {
+  const { data: takenMobile, error: mobileError } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("mobile", mobile)
+    .maybeSingle();
+  if (mobileError) fail(`Checking the mobile number: ${mobileError.message}`);
+  if (takenMobile) fail(`${mobile} is already used by ${takenMobile.name}.`);
+}
+
 const { data: created, error: createError } = await supabase.auth.admin.createUser({
-  email: loginEmailForMobile(mobile),
+  email: loginEmailForUsername(username),
   password,
   email_confirm: true,
 });
@@ -75,10 +97,11 @@ if (createError) fail(`Creating the login: ${createError.message}`);
 
 const { error: profileError } = await supabase
   .from("profiles")
-  .insert({ auth_user_id: created.user.id, name, mobile, is_admin: true });
+  .insert({ auth_user_id: created.user.id, name, username, mobile, is_admin: true });
 if (profileError) {
   await supabase.auth.admin.deleteUser(created.user.id);
   fail(`Creating the profile (login removed again): ${profileError.message}`);
 }
 
-console.log(`Admin created: ${name} (${mobile}). Sign in with this mobile number and password.`);
+const signInWith = mobile ? "this username or mobile number" : "this username";
+console.log(`Admin created: ${name} (${username}${mobile ? `, ${mobile}` : ""}). Sign in with ${signInWith} and password.`);

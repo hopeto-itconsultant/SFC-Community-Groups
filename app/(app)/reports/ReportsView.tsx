@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { FellowshipReport, FollowUpReport, ReportType, User } from "@/data/types";
+import type { FellowshipReport, FollowUpReport, Report, ReportType, User } from "@/data/types";
 import { PlusIcon, XIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
+import { ReportCalendar, type ReportDayMarker } from "@/components/ReportCalendar";
 import {
   CARD_LABELS,
   ExpenseCard,
@@ -12,9 +13,10 @@ import {
   ReportTypeCard,
 } from "@/components/reports";
 import { EmptyState, LinkButton } from "@/components/ui";
+import { ReportLayoutSwitch } from "@/components/ViewToggle";
 import { getGroupById, getGroups, getReportTypeSummaries, getReports } from "@/lib/data-access";
 import { CONTACT_MODES, formatRupees } from "@/lib/format";
-import type { ReportPeriod } from "@/lib/report-rules";
+import { getReportDate, type ReportPeriod } from "@/lib/report-rules";
 import { GroupSelect } from "./GroupSelect";
 import { type ReportsParams, reportsHref } from "./hrefs";
 
@@ -43,7 +45,7 @@ async function groupScope(user: User, requestedGroupId: string | undefined) {
 
 function FilterBar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur">
+    <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">
       {children}
     </div>
   );
@@ -113,6 +115,58 @@ async function ReportsOverview({ scope: { isAdmin, groupId, subtitle } }: { scop
   );
 }
 
+/** Keeps getReports order: newest event date first, including within one day. */
+function groupReportsByDate(reports: Report[]): Map<string, Report[]> {
+  const grouped = new Map<string, Report[]>();
+  for (const report of reports) {
+    const iso = getReportDate(report);
+    const day = grouped.get(iso);
+    if (day) day.push(report);
+    else grouped.set(iso, [report]);
+  }
+  return grouped;
+}
+
+function ReportCollection({
+  reports,
+  expenses,
+  fellowshipListing,
+  followUpTable,
+}: {
+  reports: Report[];
+  expenses: boolean;
+  fellowshipListing: boolean;
+  followUpTable: boolean;
+}) {
+  if (fellowshipListing) {
+    const fellowshipReports = reports.filter((r): r is FellowshipReport => r.type === "fellowship");
+    return (
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+        {fellowshipReports.map((r) => (
+          <FellowshipListRow key={r.id} report={r} />
+        ))}
+      </div>
+    );
+  }
+
+  if (followUpTable) {
+    const followUpReports = reports.filter((r): r is FollowUpReport => r.type === "follow-up");
+    return <FollowUpTable reports={followUpReports} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {reports.map((r) =>
+        expenses && r.type === "fellowship" ? (
+          <ExpenseCard key={r.id} report={r} />
+        ) : (
+          <ReportCard key={r.id} report={r} />
+        ),
+      )}
+    </div>
+  );
+}
+
 async function AdminGroupFilter({ params }: { params: ReportsParams }) {
   const groups = await getGroups();
   return (
@@ -134,6 +188,14 @@ async function ReportsTypeList({
   expenses: boolean;
 }) {
   const reports = await getReports({ groupId, type, period, withExpense: expenses });
+  const namedGroups = await Promise.all([...new Set(reports.map((r) => r.groupId))].map((id) => getGroupById(id)));
+  const groupNames = new Map(namedGroups.flatMap((group) => (group ? [[group.id, group.name] as const] : [])));
+  const markers: ReportDayMarker[] = reports.map((report) => ({
+    id: report.id,
+    date: getReportDate(report),
+    type: report.type,
+    groupName: groupNames.get(report.groupId) ?? "",
+  }));
   const params: ReportsParams = {
     type: expenses ? undefined : type,
     period,
@@ -159,6 +221,19 @@ async function ReportsTypeList({
   const followUpReports = reports.filter((r): r is FollowUpReport => r.type === "follow-up");
   const totalAttendees = fellowshipReports.reduce((sum, r) => sum + r.attendees, 0);
   const totalFirstTimers = fellowshipReports.reduce((sum, r) => sum + r.firstTimers, 0);
+  const days: Record<string, ReactNode> = {};
+  for (const [date, dayReports] of groupReportsByDate(reports)) {
+    days[date] = (
+      <ReportCollection
+        reports={dayReports}
+        expenses={expenses}
+        fellowshipListing={fellowshipListing}
+        followUpTable={followUpTable}
+      />
+    );
+  }
+  const emptyDescription =
+    period || (isAdmin && groupId) ? "Try a different filter." : "Nothing has been filed yet.";
 
   return (
     <>
@@ -179,70 +254,71 @@ async function ReportsTypeList({
       {isAdmin && <AdminGroupFilter params={params} />}
 
       <div className="p-4">
-        <div className="mb-3 flex items-center justify-between gap-2 px-1">
-          <p className="text-sm text-slate-500">
-            {reports.length} report{reports.length === 1 ? "" : "s"}
-            {expenses && (
-              <>
-                {" · "}
-                <span className="font-semibold text-slate-700">{formatRupees(totalSpent)}</span> total
-              </>
-            )}
-            {fellowshipListing && (
-              <>
-                {" · "}
-                {totalAttendees} attendees · {totalFirstTimers} first-timers
-              </>
-            )}
-            {followUpTable &&
-              CONTACT_MODES.map((m) => (
-                <span key={m.value}>
+        <ReportLayoutSwitch
+          summary={
+            <p className="text-sm text-slate-500">
+              {reports.length} report{reports.length === 1 ? "" : "s"}
+              {expenses && (
+                <>
                   {" · "}
-                  {followUpReports.filter((r) => r.mode === m.value).length}{" "}
-                  <span role="img" aria-label={m.label}>
-                    {m.emoji}
+                  <span className="font-semibold text-slate-700">{formatRupees(totalSpent)}</span> total
+                </>
+              )}
+              {fellowshipListing && (
+                <>
+                  {" · "}
+                  {totalAttendees} attendees · {totalFirstTimers} first-timers
+                </>
+              )}
+              {followUpTable &&
+                CONTACT_MODES.map((m) => (
+                  <span key={m.value}>
+                    {" · "}
+                    {followUpReports.filter((r) => r.mode === m.value).length}{" "}
+                    <span role="img" aria-label={m.label}>
+                      {m.emoji}
+                    </span>
                   </span>
-                </span>
-              ))}
-          </p>
-          {period && (
-            <Link
-              href={reportsHref({ ...params, period: undefined })}
-              replace
-              aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
-            >
-              {PERIOD_LABELS[period]}
-              <XIcon width={14} height={14} />
-            </Link>
-          )}
-        </div>
-        {reports.length && fellowshipListing ? (
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-            {fellowshipReports.map((r) => (
-              <FellowshipListRow key={r.id} report={r} />
-            ))}
-          </div>
-        ) : reports.length && followUpTable ? (
-          <FollowUpTable reports={followUpReports} />
-        ) : reports.length ? (
-          <div className="space-y-3">
-            {reports.map((r) =>
-              expenses && r.type === "fellowship" ? (
-                <ExpenseCard key={r.id} report={r} />
-              ) : (
-                <ReportCard key={r.id} report={r} />
-              ),
-            )}
-          </div>
-        ) : (
-          <EmptyState
-            title="No reports found"
-            description={
-              period || (isAdmin && groupId) ? "Try a different filter." : "Nothing has been filed yet."
-            }
-          />
-        )}
+                ))}
+            </p>
+          }
+          periodChip={
+            period ? (
+              <Link
+                href={reportsHref({ ...params, period: undefined })}
+                replace
+                aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
+                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
+              >
+                {PERIOD_LABELS[period]}
+                <XIcon width={14} height={14} />
+              </Link>
+            ) : undefined
+          }
+          grid={
+            reports.length ? (
+              <ReportCollection
+                reports={reports}
+                expenses={expenses}
+                fellowshipListing={fellowshipListing}
+                followUpTable={followUpTable}
+              />
+            ) : (
+              <EmptyState title="No reports found" description={emptyDescription} />
+            )
+          }
+          calendar={
+            reports.length ? (
+              <ReportCalendar
+                key={`${groupId ?? "all"}-${type ?? "all"}-${period ?? "any"}-${expenses}`}
+                markers={markers}
+                days={days}
+              />
+            ) : (
+              <EmptyState title="No reports found" description={emptyDescription} />
+            )
+          }
+        />
       </div>
     </>
   );

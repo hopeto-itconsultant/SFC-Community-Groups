@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { CommunityGroup, User } from "@/data/types";
+import type { CommunityGroup, CurrentUser } from "@/data/types";
+import { displayName } from "@/lib/format";
 
 interface SessionValue {
-  user: User;
+  user: CurrentUser;
   group: CommunityGroup | undefined;
 }
 
@@ -24,4 +25,10 @@ export function useCurrentUser(): SessionValue {
   const ctx = useContext(SessionContext);
   if (!ctx) throw new Error("useCurrentUser must be used inside <SessionProvider>");
   return ctx;
+}
+
+/** Formats names for the signed-in person's screens, following their salutation choice. */
+export function useDisplayName(): (name: string) => string {
+  const { user } = useCurrentUser();
+  return (name) => displayName(name, user.showSalutations);
 }

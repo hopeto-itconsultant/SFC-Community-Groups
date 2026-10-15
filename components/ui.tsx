@@ -59,9 +59,17 @@ export function Card({ className = "", ...props }: ComponentProps<"div">) {
   );
 }
 
-export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function SectionTitle({
+  children,
+  action,
+  className = "mb-2 mt-6",
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mb-2 mt-6 flex items-center justify-between px-1">
+    <div className={`flex items-center justify-between px-1 ${className}`}>
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>
       {action}
     </div>

@@ -2,13 +2,16 @@
 
 import Image from "next/image";
 import { startTransition, useActionState, useState } from "react";
-import type { CommunityGroup, Frequency } from "@/data/types";
+import type { CommunityGroup } from "@/data/types";
 import type { FormState } from "@/lib/actions/types";
 import { FREQUENCY_LABELS } from "@/lib/format";
-import { Field, FormSection, SubmitBar, inputClass } from "./form";
+import { ChoiceField, Field, FormSection, SubmitBar, inputClass } from "./form";
 import { PhotoPicker, appendPhotos, usePhotoItems } from "./PhotoPicker";
 
-const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
+const FREQUENCY_OPTIONS = [
+  { value: "monthly", label: FREQUENCY_LABELS.monthly },
+  { value: "every-2-months", label: FREQUENCY_LABELS["every-2-months"] },
+];
 
 /** Add/edit form for a group's profile. */
 export function GroupForm({
@@ -27,7 +30,6 @@ export function GroupForm({
   const { photos, setPhotos } = usePhotoItems();
   const [name, setName] = useState(initial?.name ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
-  const [frequency, setFrequency] = useState<Frequency>(initial?.frequency ?? "every-2-months");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,7 +40,7 @@ export function GroupForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3 px-4 pt-4">
       <FormSection title="Group Details">
-        <Field label="Group Name">
+        <Field label="Group Name" required>
           <input
             name="name"
             type="text"
@@ -51,7 +53,7 @@ export function GroupForm({
             className={inputClass}
           />
         </Field>
-        <Field label="Category" optional>
+        <Field label="Category">
           <input
             name="category"
             type="text"
@@ -63,20 +65,13 @@ export function GroupForm({
           />
         </Field>
         {canEditFrequency ? (
-          <Field label="Fellowship Frequency">
-            <select
-              name="frequency"
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value as Frequency)}
-              className={inputClass}
-            >
-              {FREQUENCIES.map((f) => (
-                <option key={f} value={f}>
-                  {FREQUENCY_LABELS[f]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <ChoiceField
+            label="Fellowship Frequency"
+            name="frequency"
+            required
+            options={FREQUENCY_OPTIONS}
+            defaultValue={initial?.frequency ?? "every-2-months"}
+          />
         ) : (
           <div>
             <p className="mb-1.5 text-sm font-semibold text-slate-700">Fellowship Frequency</p>

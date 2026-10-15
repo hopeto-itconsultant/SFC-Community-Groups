@@ -1,10 +1,10 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import type { CommunityGroup, NextFellowship, User } from "@/data/types";
+import type { CommunityGroup, CurrentUser, NextFellowship } from "@/data/types";
 import type { FormState } from "@/lib/actions/types";
-import { FREQUENCY_LABELS, todayISO } from "@/lib/format";
-import { FiledBy, Field, FormSection, SubmitBar, inputClass } from "./form";
+import { FREQUENCY_LABELS, timeInputValue, todayISO } from "@/lib/format";
+import { DateTimeField, FiledBy, Field, FormSection, SubmitBar, dateTimeControlClass, inputClass } from "./form";
 
 /** New or edit form for a next-fellowship plan; pass `initial` to edit an existing plan. */
 export function NextFellowshipForm({
@@ -14,7 +14,7 @@ export function NextFellowshipForm({
   submitLabel,
   action,
 }: {
-  user: User;
+  user: CurrentUser;
   group: CommunityGroup;
   initial?: NextFellowship;
   submitLabel: string;
@@ -22,6 +22,7 @@ export function NextFellowshipForm({
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [proposedDate, setProposedDate] = useState(initial?.proposedDate ?? "");
+  const [proposedTime, setProposedTime] = useState(timeInputValue(initial?.time));
   const [location, setLocation] = useState(initial?.location ?? "");
   const [activity, setActivity] = useState(initial?.activity ?? "");
   const [goals, setGoals] = useState(initial?.goals ?? "");
@@ -35,21 +36,34 @@ export function NextFellowshipForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3 px-4 pt-4">
       <FormSection title="When & Where">
-        <Field
-          label="Proposed Date"
+        <DateTimeField
+          label="Proposed Date & Time:"
           hint={group.frequency && `${group.name} meets: ${FREQUENCY_LABELS[group.frequency]}`}
-        >
-          <input
-            name="proposedDate"
-            type="date"
-            required
-            value={proposedDate}
-            min={todayISO()}
-            onChange={(e) => setProposedDate(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Location">
+          date={
+            <input
+              name="proposedDate"
+              type="date"
+              required
+              aria-label="Proposed date"
+              value={proposedDate}
+              min={todayISO()}
+              onChange={(e) => setProposedDate(e.target.value)}
+              className={dateTimeControlClass}
+            />
+          }
+          time={
+            <input
+              name="time"
+              type="time"
+              required
+              aria-label="Proposed time"
+              value={proposedTime}
+              onChange={(e) => setProposedTime(e.target.value)}
+              className={dateTimeControlClass}
+            />
+          }
+        />
+        <Field label="Location" required>
           <input
             name="location"
             type="text"
@@ -74,7 +88,7 @@ export function NextFellowshipForm({
             className={inputClass}
           />
         </Field>
-        <Field label="Goals">
+        <Field label="Goals" required>
           <textarea
             name="goals"
             rows={3}

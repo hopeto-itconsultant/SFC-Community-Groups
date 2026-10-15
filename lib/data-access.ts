@@ -7,6 +7,7 @@ import type {
   CommunityGroup,
   ContactMode,
   FellowshipReport,
+  FollowUpReport,
   Frequency,
   GroupStatus,
   NextFellowship,
@@ -15,9 +16,17 @@ import type {
   User,
 } from "@/data/types";
 import { createClient } from "@/lib/supabase/server";
-import { nextMonthISO, startOfLocalDateISO, toLocalDateTimeISO, todayISO } from "./format";
+import {
+  nextMonthISO,
+  splitReportDateTime,
+  startOfDayTimestamp,
+  startOfLocalDateISO,
+  startOfNextDayTimestamp,
+  toLocalDateTimeISO,
+  todayISO,
+} from "./format";
 import { photoUrl } from "./photos";
-import type { ReportQuery, ReportTypeSummaries } from "./report-rules";
+import { fileableFellowshipPlans, type ReportQuery, type ReportTypeSummaries } from "./report-rules";
 
 type GroupRole = "leader" | "asst-leader";
 
@@ -44,6 +53,7 @@ interface ReportRow {
   group_id: string;
   type: ReportType;
   filed_by: string;
+  /** Timestamp without timezone. Midnight means no time was recorded. */
   report_date: string;
   location: string | null;
   comments: string | null;
@@ -116,12 +126,14 @@ function toReport(row: ReportRow): Report {
     filedBy: row.filed_by,
     createdAt: toLocalDateTimeISO(row.created_at),
   };
+  const when = splitReportDateTime(row.report_date);
   switch (row.type) {
     case "fellowship":
       return {
         ...base,
         type: "fellowship",
-        date: row.report_date,
+        date: when.date,
+        time: when.time,
         location: row.location ?? "",
         attendees: row.attendees ?? 0,
         firstTimers: row.first_timers ?? 0,
@@ -135,7 +147,7 @@ function toReport(row: ReportRow): Report {
       return {
         ...base,
         type: "follow-up",
-        date: row.report_date,
+        date: when.date,
         personName: row.person_name ?? "",
         // The reports_fields_match_type check requires contact_mode on follow-ups.
         mode: row.contact_mode as ContactMode,
@@ -145,7 +157,8 @@ function toReport(row: ReportRow): Report {
       return {
         ...base,
         type: "next-fellowship",
-        proposedDate: row.report_date,
+        proposedDate: when.date,
+        time: when.time,
         location: row.location ?? "",
         activity: row.activity ?? "",
         goals: row.goals ?? "",
@@ -229,7 +242,7 @@ const loadReports = cache(
         .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
         .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
     } else if (period === "upcoming") {
-      query = query.eq("type", "next-fellowship").is("cancelled_at", null).gte("report_date", today);
+      query = query.eq("type", "next-fellowship").is("cancelled_at", null).gte("report_date", startOfDayTimestamp(today));
     }
     const rows = unwrap<ReportRow[]>(
       "reports",
@@ -265,7 +278,7 @@ export const getLastFellowship = cache(async (groupId: string): Promise<Fellowsh
       .select(REPORT_COLUMNS)
       .eq("group_id", idFilter(groupId))
       .eq("type", "fellowship")
-      .lte("report_date", todayISO())
+      .lt("report_date", startOfNextDayTimestamp(todayISO()))
       .order("report_date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(1)
@@ -284,7 +297,7 @@ const loadUpcomingFellowships = cache(async (): Promise<NextFellowship[]> => {
       .select(REPORT_COLUMNS)
       .eq("type", "next-fellowship")
       .is("cancelled_at", null)
-      .gte("report_date", todayISO())
+      .gte("report_date", startOfDayTimestamp(todayISO()))
       .order("report_date", { ascending: true })
       .order("created_at", { ascending: true }),
   );
@@ -301,6 +314,62 @@ export async function getNextFellowship(groupId: string): Promise<NextFellowship
   return (await getUpcomingFellowships(groupId))[0];
 }
 
+/** Uncancelled plans for this group dated today or earlier that have no fellowship report yet. */
+export const getFileableFellowshipPlans = cache(async (groupId: string): Promise<NextFellowship[]> => {
+  const supabase = await createClient();
+  const group = idFilter(groupId);
+  const today = todayISO();
+  const [plansResult, filedResult] = await Promise.all([
+    supabase
+      .from("reports")
+      .select(REPORT_COLUMNS)
+      .eq("group_id", group)
+      .eq("type", "next-fellowship")
+      .is("cancelled_at", null)
+      .lt("report_date", startOfNextDayTimestamp(today))
+      .order("created_at", { ascending: false }),
+    supabase.from("reports").select("report_date").eq("group_id", group).eq("type", "fellowship"),
+  ]);
+  const plans = unwrap<ReportRow[]>("fellowship plans", plansResult).map(toReport) as NextFellowship[];
+  const filedDates = unwrap<{ report_date: string }[]>("fellowship dates", filedResult).map(
+    (row) => splitReportDateTime(row.report_date).date,
+  );
+  return fileableFellowshipPlans(plans, filedDates);
+});
+
+/** Whether this group already has a fellowship report on `date`. Pass `exceptId` when editing that report. */
+export async function hasFellowshipOnDate(groupId: string, date: string, exceptId?: string): Promise<boolean> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("reports")
+    .select("id")
+    .eq("group_id", idFilter(groupId))
+    .eq("type", "fellowship")
+    .gte("report_date", startOfDayTimestamp(date))
+    .lt("report_date", startOfNextDayTimestamp(date));
+  if (isUuid(exceptId)) query = query.neq("id", exceptId);
+  const rows = unwrap<{ id: string }[]>("fellowship report", await query.limit(1));
+  return rows.length > 0;
+}
+
+/** True when no later report of the same type has been filed for this group. */
+export const isLatestFiledReport = cache(async (report: FellowshipReport | FollowUpReport): Promise<boolean> => {
+  const supabase = await createClient();
+  const row = unwrap<{ id: string } | null>(
+    "latest report",
+    await supabase
+      .from("reports")
+      .select("id")
+      .eq("group_id", idFilter(report.groupId))
+      .eq("type", report.type)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  );
+  return row?.id === report.id;
+});
+
 /** Reports filed during the current calendar month. */
 export async function getReportsFiledThisMonth(groupId?: string): Promise<Report[]> {
   return getReports({ groupId, period: "this-month" });
@@ -315,11 +384,54 @@ export const getReportTypeSummaries = cache(async (groupId?: string): Promise<Re
   );
 });
 
+export interface AdminAccount {
+  id: string;
+  name: string;
+  username?: string;
+  mobile?: string;
+  hasLogin: boolean;
+  active: boolean;
+}
+
+/** Every admin, active and deactivated, ordered by name. */
+export async function getAdmins(): Promise<AdminAccount[]> {
+  const supabase = await createClient();
+  const rows = unwrap<
+    {
+      id: string;
+      name: string;
+      username: string | null;
+      mobile: string | null;
+      auth_user_id: string | null;
+      active: boolean;
+    }[]
+  >(
+    "admins",
+    await supabase
+      .from("profiles")
+      .select("id, name, username, mobile, auth_user_id, active")
+      .eq("is_admin", true),
+  );
+  return rows
+    .map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      username: profile.username ?? undefined,
+      mobile: profile.mobile ?? undefined,
+      hasLogin: !!profile.auth_user_id,
+      active: profile.active,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export interface GroupMember {
   id: string;
   name: string;
   role: GroupRole;
   mobile?: string;
+  dateOfBirth?: string;
+  email?: string;
+  servingSince?: string;
   hasLogin: boolean;
   active: boolean;
 }
@@ -331,13 +443,22 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
     {
       role: GroupRole;
       created_at: string;
-      profiles: { id: string; name: string; mobile: string | null; auth_user_id: string | null; active: boolean };
+      profiles: {
+        id: string;
+        name: string;
+        mobile: string | null;
+        date_of_birth: string | null;
+        email: string | null;
+        serving_since: string | null;
+        auth_user_id: string | null;
+        active: boolean;
+      };
     }[]
   >(
     "group members",
     await supabase
       .from("group_leaders")
-      .select("role, created_at, profiles(id, name, mobile, auth_user_id, active)")
+      .select("role, created_at, profiles(id, name, mobile, date_of_birth, email, serving_since, auth_user_id, active)")
       .eq("group_id", idFilter(groupId)),
   );
   const order: Record<GroupRole, number> = { leader: 0, "asst-leader": 1 };
@@ -348,7 +469,211 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
       name: p.name,
       role,
       mobile: p.mobile ?? undefined,
+      dateOfBirth: p.date_of_birth ?? undefined,
+      email: p.email ?? undefined,
+      servingSince: p.serving_since ?? undefined,
       hasLogin: !!p.auth_user_id,
       active: p.active,
     }));
+}
+
+export interface LeaderRosterMember {
+  id: string;
+  name: string;
+  role: GroupRole;
+  mobile?: string;
+  hasLogin: boolean;
+  active: boolean;
+}
+
+export interface LeaderRosterGroup {
+  id: string;
+  name: string;
+  status: GroupStatus;
+  members: LeaderRosterMember[];
+}
+
+/** Every leader and assistant leader, grouped by group. Admins are left out. */
+export async function getLeaderRoster(): Promise<LeaderRosterGroup[]> {
+  const supabase = await createClient();
+  const rows = unwrap<
+    {
+      role: GroupRole;
+      profiles: {
+        id: string;
+        name: string;
+        mobile: string | null;
+        auth_user_id: string | null;
+        active: boolean;
+        is_admin: boolean;
+      } | null;
+      groups: { id: string; name: string; status: GroupStatus } | null;
+    }[]
+  >(
+    "leaders",
+    await supabase
+      .from("group_leaders")
+      .select("role, profiles(id, name, mobile, auth_user_id, active, is_admin), groups(id, name, status)"),
+  );
+
+  const byGroup = new Map<string, LeaderRosterGroup>();
+  for (const row of rows) {
+    const profile = row.profiles;
+    const group = row.groups;
+    if (!profile || !group || profile.is_admin) continue;
+    const bucket = byGroup.get(group.id) ?? {
+      id: group.id,
+      name: group.name,
+      status: group.status,
+      members: [],
+    };
+    bucket.members.push({
+      id: profile.id,
+      name: profile.name,
+      role: row.role,
+      mobile: profile.mobile ?? undefined,
+      hasLogin: !!profile.auth_user_id,
+      active: profile.active,
+    });
+    byGroup.set(group.id, bucket);
+  }
+
+  const roleOrder: Record<GroupRole, number> = { leader: 0, "asst-leader": 1 };
+  for (const group of byGroup.values()) {
+    group.members.sort((a, b) => roleOrder[a.role] - roleOrder[b.role] || a.name.localeCompare(b.name));
+  }
+
+  return [...byGroup.values()].sort((a, b) => {
+    const closed = Number(a.status === "closed") - Number(b.status === "closed");
+    return closed || a.name.localeCompare(b.name);
+  });
+}
+
+export interface LeaderProfileGroup {
+  id: string;
+  name: string;
+  role: GroupRole;
+  status: GroupStatus;
+}
+
+export interface LeaderProfile {
+  id: string;
+  name: string;
+  dateOfBirth?: string;
+  email?: string;
+  servingSince?: string;
+  active: boolean;
+  groups: LeaderProfileGroup[];
+}
+
+/** One leader or assistant leader, with every group they serve. Admins are left out. */
+export async function getLeaderProfile(profileId: string): Promise<LeaderProfile | null> {
+  if (!isUuid(profileId)) return null;
+  const supabase = await createClient();
+  const row = unwrap<
+    | {
+        id: string;
+        name: string;
+        date_of_birth: string | null;
+        email: string | null;
+        serving_since: string | null;
+        active: boolean;
+        is_admin: boolean;
+        group_leaders: {
+          role: GroupRole;
+          groups: { id: string; name: string; status: GroupStatus } | null;
+        }[];
+      }
+    | null
+  >(
+    "leader",
+    await supabase
+      .from("profiles")
+      .select("id, name, date_of_birth, email, serving_since, active, is_admin, group_leaders(role, groups(id, name, status))")
+      .eq("id", profileId)
+      .maybeSingle(),
+  );
+  if (!row || row.is_admin) return null;
+  const groups = row.group_leaders.flatMap((entry) =>
+    entry.groups ? [{ id: entry.groups.id, name: entry.groups.name, role: entry.role, status: entry.groups.status }] : [],
+  );
+  groups.sort((a, b) => a.name.localeCompare(b.name) || a.role.localeCompare(b.role));
+  return {
+    id: row.id,
+    name: row.name,
+    dateOfBirth: row.date_of_birth ?? undefined,
+    email: row.email ?? undefined,
+    servingSince: row.serving_since ?? undefined,
+    active: row.active,
+    groups,
+  };
+}
+
+export interface AssistantLeader {
+  id: string;
+  name: string;
+  dateOfBirth?: string;
+  email?: string;
+  servingSince?: string;
+  active: boolean;
+  groups: { id: string; name: string; status: GroupStatus }[];
+}
+
+/**
+ * Assistant leaders of these groups, except the person whose page is open.
+ * Someone who assists more than one of the groups is listed once.
+ */
+export async function getAssistantLeaders(groupIds: string[], excludeProfileId: string): Promise<AssistantLeader[]> {
+  const ids = [...new Set(groupIds.filter(isUuid))];
+  if (!ids.length) return [];
+
+  const supabase = await createClient();
+  const rows = unwrap<
+    {
+      profiles: {
+        id: string;
+        name: string;
+        date_of_birth: string | null;
+        email: string | null;
+        serving_since: string | null;
+        active: boolean;
+        is_admin: boolean;
+      } | null;
+      groups: { id: string; name: string; status: GroupStatus } | null;
+    }[]
+  >(
+    "assistant leaders",
+    await supabase
+      .from("group_leaders")
+      .select("profiles(id, name, date_of_birth, email, serving_since, active, is_admin), groups(id, name, status)")
+      .eq("role", "asst-leader")
+      .in("group_id", ids),
+  );
+
+  const byId = new Map<string, AssistantLeader>();
+  for (const row of rows) {
+    const profile = row.profiles;
+    const group = row.groups;
+    if (!profile || !group || profile.is_admin || profile.id === excludeProfileId) continue;
+    const existing = byId.get(profile.id);
+    const groupRef = { id: group.id, name: group.name, status: group.status };
+    if (existing) {
+      if (!existing.groups.some((item) => item.id === groupRef.id)) existing.groups.push(groupRef);
+      continue;
+    }
+    byId.set(profile.id, {
+      id: profile.id,
+      name: profile.name,
+      dateOfBirth: profile.date_of_birth ?? undefined,
+      email: profile.email ?? undefined,
+      servingSince: profile.serving_since ?? undefined,
+      active: profile.active,
+      groups: [groupRef],
+    });
+  }
+
+  for (const person of byId.values()) {
+    person.groups.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

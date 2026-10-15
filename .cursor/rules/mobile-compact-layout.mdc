@@ -1,0 +1,48 @@
+---
+description: Keep mobile screens short — one header line, no stacked section headings
+alwaysApply: true
+---
+
+# Compact mobile layout
+
+Screens are used on a phone. Extra headings make people scroll. One header is enough.
+
+## Page header
+
+- Use a single header line (`PageHeader` title only).
+- Do not add a subtitle on its own line under the title.
+- If something matters (group name, status), put it on that same line in smaller type.
+
+```tsx
+// Bad — title, then a second line
+<PageHeader title="Fellowship Report" subtitle={group.name} />
+
+// Good — one line; extra context is smaller, on the same line
+<header>
+  <h1>
+    Fellowship Report <span className="text-sm font-normal text-slate-500">{group.name}</span>
+  </h1>
+</header>
+```
+
+## Sections
+
+- Do not add titled subsections (`FormSection` headings) above fields that already have labels. "Attendance" over "Attendees" is a header and a subheader.
+- Do not repeat the idea: page title, then section title, then field label.
+- Put a short note on the same label row in smaller type (`Field` `aside`). Do not add a hint line under the control for that note.
+- Keep short related inputs on one row. A new block is only for content that needs the height (a textarea, photos).
+- Country and number share one “Mobile number” row. Date and time share one “Date & Time” row.
+
+```tsx
+// Bad — section heading plus field labels, each adding height
+<FormSection title="Attendance">
+  <Field label="Attendees">...</Field>
+  <Field label="First-time">...</Field>
+</FormSection>
+
+// Good — the field label is the only heading; a note stays on that line
+<div className="grid grid-cols-2 gap-3">
+  <Field label="Attendees" aside="Planned: 12">...</Field>
+  <Field label="First-time">...</Field>
+</div>
+```

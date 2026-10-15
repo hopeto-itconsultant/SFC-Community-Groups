@@ -20,6 +20,58 @@ export function formatShortDate(iso: string): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
+/** "17:30" or "17:30:00" -> "5:30 PM". */
+export function formatTime(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Date, with the time appended when one was recorded. */
+export function formatDateTime(iso: string, time?: string): string {
+  return time ? `${formatDate(iso)}, ${formatTime(time)}` : formatDate(iso);
+}
+
+/** Short date, with the time appended when one was recorded. */
+export function formatShortDateTime(iso: string, time?: string): string {
+  return time ? `${formatShortDate(iso)}, ${formatTime(time)}` : formatShortDate(iso);
+}
+
+/** "HH:MM:SS" from the database as the "HH:MM" a time input expects. */
+export function timeInputValue(time?: string): string {
+  return time ? time.slice(0, 5) : "";
+}
+
+/** Calendar date plus optional "HH:MM" as a timestamp without timezone. Midnight when time is absent. */
+export function combineDateAndTime(date: string, time?: string): string {
+  const match = time?.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  const clock = match ? `${match[1]}:${match[2]}:${match[3] ?? "00"}` : "00:00:00";
+  return `${date.slice(0, 10)}T${clock}`;
+}
+
+/** Inclusive start of a local calendar day, e.g. "2026-10-14T00:00:00". */
+export function startOfDayTimestamp(iso: string): string {
+  return `${iso.slice(0, 10)}T00:00:00`;
+}
+
+/** Exclusive end of a local calendar day: midnight at the start of the next day. */
+export function startOfNextDayTimestamp(iso: string): string {
+  return `${addDaysISO(iso.slice(0, 10), 1)}T00:00:00`;
+}
+
+/**
+ * Splits a stored report timestamp into a calendar date and an optional clock time.
+ * Midnight means no time was recorded (older rows and follow-ups).
+ */
+export function splitReportDateTime(value: string): { date: string; time?: string } {
+  const date = value.slice(0, 10);
+  const match = value.slice(10).match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return { date };
+  const time = `${match[1]}:${match[2]}:${match[3] ?? "00"}`;
+  return time === "00:00:00" ? { date } : { date, time };
+}
+
 export function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -60,7 +112,7 @@ export function todayISO(): string {
   return appDateTime(new Date())[0];
 }
 
-/** How far back a fellowship report can be dated. */
+/** Kept so the old 7-day backdate limit can be restored. Not enforced for now. */
 export const REPORT_BACKDATE_DAYS = 7;
 
 /** Local calendar date `days` days before today. */
@@ -121,7 +173,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const CONTACT_MODES: { value: ContactMode; label: string; emoji: string }[] = [
   { value: "call", label: "Call", emoji: "📞" },
-  { value: "text", label: "Text", emoji: "💬" },
+  { value: "text", label: "Text/Whatsapp", emoji: "💬" },
   { value: "in-person", label: "In Person", emoji: "🤝" },
 ];
 
@@ -141,6 +193,14 @@ export const REPORT_TYPE_EMOJI: Record<ReportType, string> = {
   "follow-up": "📞",
   "next-fellowship": "📅",
 };
+
+const SALUTATION = /^(?:(?:bro|sis|dr|mr|mrs|ms|miss|pr|ps|rev|pastor|elder)\.?\s+)+/i;
+
+/** Name as shown on screen; drops a leading title unless `show` is on. */
+export function displayName(name: string, show: boolean): string {
+  if (show) return name;
+  return name.replace(SALUTATION, "") || name;
+}
 
 export const NOT_ASSIGNED = "Not assigned";
 export const NOT_AVAILABLE = "Not available";

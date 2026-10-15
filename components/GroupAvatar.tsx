@@ -32,6 +32,7 @@ function colorFor(id: string): string {
 }
 
 const SIZES = {
+  xs: "h-8 w-8 text-xs",
   sm: "h-10 w-10 text-sm",
   md: "h-12 w-12 text-base",
   lg: "h-16 w-16 text-xl",

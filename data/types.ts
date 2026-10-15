@@ -19,6 +19,12 @@ export interface User extends Person {
   groupId?: string;
 }
 
+/** The signed-in person, with their own display preferences. */
+export interface CurrentUser extends User {
+  /** Show titles such as "Bro." before names on this person's screens. */
+  showSalutations: boolean;
+}
+
 export interface CommunityGroup {
   id: string;
   name: string;
@@ -48,6 +54,8 @@ export interface FellowshipReport extends ReportBase {
   type: "fellowship";
   /** ISO date (YYYY-MM-DD) of the fellowship. */
   date: string;
+  /** Wall-clock start time "HH:MM:SS". Absent when none was recorded. */
+  time?: string;
   location: string;
   attendees: number;
   firstTimers: number;
@@ -72,6 +80,8 @@ export interface NextFellowship extends ReportBase {
   type: "next-fellowship";
   /** ISO date (YYYY-MM-DD). */
   proposedDate: string;
+  /** Wall-clock start time "HH:MM:SS". Absent when none was recorded. */
+  time?: string;
   location: string;
   activity: string;
   goals: string;

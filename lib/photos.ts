@@ -21,6 +21,15 @@ export function photoUrl(bucket: PhotoBucket, path: string): string {
   return `/photos/${bucket}/${path}`;
 }
 
+/** Storage path for an app photo URL, or undefined when it is not from this bucket. */
+export function storagePath(bucket: PhotoBucket, url: string): string | undefined {
+  const prefix = `/photos/${bucket}/`;
+  if (!url.startsWith(prefix)) return undefined;
+  const path = url.slice(prefix.length);
+  if (!path || path.startsWith("/") || path.includes("..")) return undefined;
+  return path;
+}
+
 /** Shortest-edge sizes app/photos can scale to, so lists don't download full-size photos. */
 export const PHOTO_VARIANTS = [192, 384] as const;
 export type PhotoVariant = (typeof PHOTO_VARIANTS)[number];

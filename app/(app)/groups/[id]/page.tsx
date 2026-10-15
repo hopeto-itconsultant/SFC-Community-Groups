@@ -63,7 +63,7 @@ async function AdminGroupView({ id, saved }: { id: string; saved?: string }) {
           </LinkButton>
           {!closed && (
             <LinkButton href={`/groups/${group.id}/edit`} variant="secondary">
-              Edit profile
+              Edit Group details
             </LinkButton>
           )}
         </div>

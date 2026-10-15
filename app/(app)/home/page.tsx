@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { CommunityGroup, User } from "@/data/types";
+import type { CommunityGroup, CurrentUser } from "@/data/types";
 import { GroupMiniCard, GroupSummaryRow, StatCard } from "@/components/groups";
 import { CalendarIcon, ChevronRightIcon, FileTextIcon } from "@/components/icons";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
@@ -17,7 +17,7 @@ import {
   getUpcomingFellowships,
 } from "@/lib/data-access";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
-import { ROLE_LABELS, formatRupees, formatShortDate } from "@/lib/format";
+import { ROLE_LABELS, displayName, formatRupees, formatShortDateTime } from "@/lib/format";
 
 export default async function HomePage() {
   const user = await requireUser();
@@ -27,17 +27,25 @@ export default async function HomePage() {
   return <LeaderHome user={user} group={group} />;
 }
 
-function Hero({ user, subtitle }: { user: User; subtitle?: string }) {
+function Hero({ user, subtitle }: { user: CurrentUser; subtitle?: string }) {
   return (
     <div className="bg-brand-700 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white">
-      <div className="flex items-center gap-2 text-sm font-semibold text-brand-100">
-        <Image src={LOGO_SRC} alt="" width={24} height={24} unoptimized className="rounded-md ring-1 ring-white/30" />
-        {APP_NAME}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-100">
+          <Image
+            src={LOGO_SRC}
+            alt=""
+            width={24}
+            height={24}
+            unoptimized
+            className="shrink-0 rounded-md ring-1 ring-white/30"
+          />
+          <span className="truncate">{APP_NAME}</span>
+        </div>
+        <h1 className="shrink-0 text-xs text-brand-100">
+          Welcome <span className="italic">{displayName(user.name, user.showSalutations)}</span>
+        </h1>
       </div>
-      <h1 className="mt-3 truncate text-base font-semibold leading-tight">
-        <span className="font-normal text-brand-100">Welcome </span>
-        {user.name}
-      </h1>
       {subtitle && (
         <div className="mt-1 flex items-center gap-2">
           <span className="truncate font-semibold">{subtitle}</span>
@@ -50,7 +58,7 @@ function Hero({ user, subtitle }: { user: User; subtitle?: string }) {
   );
 }
 
-async function AdminHome({ user }: { user: User }) {
+async function AdminHome({ user }: { user: CurrentUser }) {
   const [groups, filedThisMonth, upcoming] = await Promise.all([
     getGroups(),
     getReportsFiledThisMonth(),
@@ -80,8 +88,9 @@ async function AdminHome({ user }: { user: User }) {
             storageKey="sfc.homeGroupView"
             title="CG Status"
             placement="section"
+            sectionClassName="mb-1.5 mt-3"
             cards={
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2">
                 {groups.map((g) => (
                   <GroupMiniCard key={g.id} group={g} />
                 ))}
@@ -110,7 +119,7 @@ async function AdminHome({ user }: { user: User }) {
   );
 }
 
-function NoGroupHome({ user }: { user: User }) {
+function NoGroupHome({ user }: { user: CurrentUser }) {
   return (
     <>
       <Hero user={user} />
@@ -172,7 +181,7 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
         <StatusRow
           href={`/reports/${next.id}`}
           icon={<CalendarIcon width={18} height={18} />}
-          label={`Next · ${formatShortDate(next.proposedDate)}`}
+          label={`Next · ${formatShortDateTime(next.proposedDate, next.time)}`}
           detail={next.location}
           badge={<Badge tone="green">Upcoming</Badge>}
         />
@@ -189,7 +198,7 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
         <StatusRow
           href={`/reports/${last.id}`}
           icon={<FileTextIcon width={18} height={18} />}
-          label={`Last · ${formatShortDate(last.date)}`}
+          label={`Last · ${formatShortDateTime(last.date, last.time)}`}
           detail={`${last.attendees} attended · ${last.firstTimers} first-time`}
         />
       ) : (
@@ -204,7 +213,7 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
   );
 }
 
-async function LeaderHome({ user, group }: { user: User; group: CommunityGroup }) {
+async function LeaderHome({ user, group }: { user: CurrentUser; group: CommunityGroup }) {
   const [summaries, filedThisMonth, upcoming] = await Promise.all([
     getReportTypeSummaries(group.id),
     getReportsFiledThisMonth(group.id),

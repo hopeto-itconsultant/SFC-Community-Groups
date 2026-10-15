@@ -5,11 +5,14 @@ import { ChevronLeftIcon } from "./icons";
 export function PageHeader({
   title,
   subtitle,
+  note,
   backHref,
   action,
 }: {
   title: string;
   subtitle?: string;
+  /** Extra context on the same line as the title, in smaller type. */
+  note?: string;
   backHref?: string;
   action?: ReactNode;
 }) {
@@ -28,8 +31,15 @@ export function PageHeader({
           <div className="w-2" />
         )}
         <div className="min-w-0 flex-1 py-2">
-          <h1 className="truncate text-lg font-bold leading-tight">{title}</h1>
-          {subtitle && <p className="truncate text-sm text-slate-500">{subtitle}</p>}
+          {note ? (
+            <h1 className="flex min-w-0 items-baseline gap-2 leading-tight">
+              <span className="shrink-0 text-lg font-bold">{title}</span>
+              <span className="min-w-0 truncate text-sm font-normal text-slate-500">{note}</span>
+            </h1>
+          ) : (
+            <h1 className="truncate text-lg font-bold leading-tight">{title}</h1>
+          )}
+          {subtitle && !note && <p className="truncate text-sm text-slate-500">{subtitle}</p>}
         </div>
         {action && <div className="shrink-0 pr-2">{action}</div>}
       </div>

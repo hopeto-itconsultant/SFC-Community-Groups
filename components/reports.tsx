@@ -8,6 +8,7 @@ import type {
   Report,
   ReportType,
 } from "@/data/types";
+import { getNameDisplay } from "@/lib/auth";
 import { getGroupById, getGroups, getUserById } from "@/lib/data-access";
 import type { ReportTypeSummaries } from "@/lib/report-rules";
 import {
@@ -17,32 +18,38 @@ import {
   REPORT_TYPE_LABELS,
   contactModeLabel,
   formatDate,
+  formatDateTime,
   formatRupees,
   formatShortDate,
+  formatShortDateTime,
   todayISO,
 } from "@/lib/format";
 import { photoVariant } from "@/lib/photos";
 import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
-async function filedByName(report: Report): Promise<string> {
-  return (await getUserById(report.filedBy))?.name ?? NOT_AVAILABLE;
-}
+type NameDisplay = (name: string) => string;
 
+/** The report's group, the filer's name, and the name formatter for the signed-in person. */
 async function groupAndFiler(report: Report) {
-  return Promise.all([getGroupById(report.groupId), filedByName(report)]);
+  const [group, filer, shown] = await Promise.all([
+    getGroupById(report.groupId),
+    getUserById(report.filedBy),
+    getNameDisplay(),
+  ]);
+  return [group, filer ? shown(filer.name) : NOT_AVAILABLE, shown] as const;
 }
 
 function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-function CardSummary({ report }: { report: Report }) {
+function CardSummary({ report, shown }: { report: Report; shown: NameDisplay }) {
   switch (report.type) {
     case "fellowship":
       return (
         <>
-          <p className="text-slate-500">{formatDate(report.date)}</p>
+          <p className="text-slate-500">{formatDateTime(report.date, report.time)}</p>
           <p className="mt-2 font-semibold">{plural(report.attendees, "attendee")}</p>
           <p className="text-sm text-slate-600">
             {plural(report.firstTimers, "first-time attendee")}
@@ -53,14 +60,14 @@ function CardSummary({ report }: { report: Report }) {
       return (
         <>
           <p className="text-slate-500">{formatDate(report.date)}</p>
-          <p className="mt-2 font-semibold">{report.personName}</p>
+          <p className="mt-2 font-semibold">{shown(report.personName)}</p>
           <p className="text-sm text-slate-600">{contactModeLabel(report.mode)}</p>
         </>
       );
     case "next-fellowship":
       return (
         <>
-          <p className="text-slate-500">{formatDate(report.proposedDate)}</p>
+          <p className="text-slate-500">{formatDateTime(report.proposedDate, report.time)}</p>
           <p className="mt-2 font-semibold">{report.location}</p>
           <p className="line-clamp-2 text-sm text-slate-600">{report.activity}</p>
         </>
@@ -78,7 +85,7 @@ export function UpcomingBadge({ report }: { report: NextFellowship }) {
 }
 
 export async function ReportCard({ report }: { report: Report }) {
-  const [group, filedBy] = await groupAndFiler(report);
+  const [group, filedBy, shown] = await groupAndFiler(report);
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -96,7 +103,7 @@ export async function ReportCard({ report }: { report: Report }) {
         {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
       </div>
       <div className="mt-2">
-        <CardSummary report={report} />
+        <CardSummary report={report} shown={shown} />
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
         <p className="min-w-0 truncate text-slate-500">
@@ -124,7 +131,7 @@ export async function ExpenseCard({ report }: { report: FellowshipReport }) {
           <p className="text-lg font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
           <p className="truncate text-sm font-medium text-brand-700">{group?.name}</p>
         </div>
-        <p className="shrink-0 text-sm text-slate-500">{formatDate(report.date)}</p>
+        <p className="shrink-0 text-sm text-slate-500">{formatDateTime(report.date, report.time)}</p>
       </div>
       {report.expenseDetails && (
         <p className="mt-2 line-clamp-2 text-sm text-slate-600">{report.expenseDetails}</p>
@@ -152,7 +159,7 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <p className="shrink-0 text-sm font-bold">{formatShortDate(report.date)}</p>
+          <p className="shrink-0 text-sm font-bold">{formatShortDateTime(report.date, report.time)}</p>
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
           <p className="shrink-0 text-sm">
             <span className="font-bold">{report.attendees}</span>
@@ -194,7 +201,8 @@ function ModeCell({ mode }: { mode: FollowUpReport["mode"] }) {
 
 /** Column-aligned table of follow-ups for the all-groups view. */
 export async function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
-  const groupNames = new Map((await getGroups({ includeClosed: true })).map((g) => [g.id, g.name]));
+  const [groups, shown] = await Promise.all([getGroups({ includeClosed: true }), getNameDisplay()]);
+  const groupNames = new Map(groups.map((g) => [g.id, g.name]));
   return (
     <div
       role="table"
@@ -222,7 +230,7 @@ export async function FollowUpTable({ reports }: { reports: FollowUpReport[] }) 
             {formatShortDate(r.date)}
           </span>
           <span role="cell" className="truncate font-medium">
-            {r.personName}
+            {shown(r.personName)}
           </span>
           <span role="cell" className="truncate text-brand-700">
             {groupNames.get(r.groupId)}
@@ -280,7 +288,7 @@ function PhotoGrid({ photos }: { photos: string[] }) {
 function FellowshipDetail({ report }: { report: FellowshipReport }) {
   return (
     <>
-      <InfoRow label="Date">{formatDate(report.date)}</InfoRow>
+      <InfoRow label="Date">{formatDateTime(report.date, report.time)}</InfoRow>
       <InfoRow label="Location">{report.location}</InfoRow>
       <div className="grid grid-cols-2 gap-4">
         <InfoRow label="Attendees">{report.attendees}</InfoRow>
@@ -305,11 +313,11 @@ function FellowshipDetail({ report }: { report: FellowshipReport }) {
   );
 }
 
-function FollowUpDetail({ report }: { report: FollowUpReport }) {
+function FollowUpDetail({ report, shown }: { report: FollowUpReport; shown: NameDisplay }) {
   return (
     <>
       <InfoRow label="Date">{formatDate(report.date)}</InfoRow>
-      <InfoRow label="Person followed up">{report.personName}</InfoRow>
+      <InfoRow label="Person followed up">{shown(report.personName)}</InfoRow>
       <InfoRow label="Mode of Contact">{contactModeLabel(report.mode)}</InfoRow>
       <TextBlock label="Comments, Prayer Requests & Testimonies">{report.comments}</TextBlock>
     </>
@@ -319,7 +327,7 @@ function FollowUpDetail({ report }: { report: FollowUpReport }) {
 function NextFellowshipDetail({ report }: { report: NextFellowship }) {
   return (
     <>
-      <InfoRow label="Proposed Date">{formatDate(report.proposedDate)}</InfoRow>
+      <InfoRow label="Proposed Date">{formatDateTime(report.proposedDate, report.time)}</InfoRow>
       <InfoRow label="Location">{report.location}</InfoRow>
       <TextBlock label="Activity & Discussion">{report.activity}</TextBlock>
       <TextBlock label="Goals">{report.goals}</TextBlock>
@@ -330,7 +338,7 @@ function NextFellowshipDetail({ report }: { report: NextFellowship }) {
 
 /** Full read-only view of a report; also used for the post-submit confirmation. */
 export async function ReportDetail({ report }: { report: Report }) {
-  const [group, filedBy] = await groupAndFiler(report);
+  const [group, filedBy, shown] = await groupAndFiler(report);
   return (
     <Card>
       <div className="flex items-start justify-between gap-2">
@@ -345,7 +353,7 @@ export async function ReportDetail({ report }: { report: Report }) {
       </div>
       <dl className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
         {report.type === "fellowship" && <FellowshipDetail report={report} />}
-        {report.type === "follow-up" && <FollowUpDetail report={report} />}
+        {report.type === "follow-up" && <FollowUpDetail report={report} shown={shown} />}
         {report.type === "next-fellowship" && <NextFellowshipDetail report={report} />}
         <InfoRow label="Report Filed By">
           {filedBy}
@@ -366,7 +374,7 @@ export function NextFellowshipSummary({ report }: { report: NextFellowship }) {
     >
       <div className="flex items-center gap-2 text-lg font-bold">
         <CalendarIcon className="text-brand-700" />
-        {formatDate(report.proposedDate)}
+        {formatDateTime(report.proposedDate, report.time)}
       </div>
       <div className="mt-1 flex items-center gap-2 text-slate-600">
         <MapPinIcon width={18} height={18} className="shrink-0 text-slate-400" />
@@ -530,7 +538,7 @@ export function LastFellowshipSummary({ report }: { report: FellowshipReport }) 
       className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center justify-between">
-        <p className="text-lg font-bold">{formatDate(report.date)}</p>
+        <p className="text-lg font-bold">{formatDateTime(report.date, report.time)}</p>
         <span className="flex items-center text-sm font-semibold text-brand-700">
           View <ChevronRightIcon width={18} height={18} />
         </span>
