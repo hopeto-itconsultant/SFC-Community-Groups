@@ -71,8 +71,8 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   const cache = await caches.open(PAGE_CACHE);
   try {
+    // Redirects (e.g. signed out -> /login) arrive as status-0 "opaqueredirect" responses; pass them through.
     const response = await fetch(request);
-    if (response.type === "error" || response.status === 0) throw new Error("offline");
     if (response.ok && response.type === "basic" && !isBlocked(new URL(response.url))) {
       await cache.put(request, response.clone());
     }
