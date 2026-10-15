@@ -6,6 +6,7 @@ import { LeaderDetailFields } from "@/components/LeaderDetailFields";
 import { PasswordStrengthMeter } from "@/components/PasswordStrength";
 import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, ConfirmCard } from "@/components/ui";
+import { loginAsLeader } from "@/lib/actions/auth";
 import { type LoginState, type MemberDetailsState, removeMember, setLogin, updateMemberDetails } from "@/lib/actions/people";
 import { copyText } from "@/lib/copy-text";
 import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
@@ -20,6 +21,7 @@ export function MemberCard({ groupId, member }: { groupId: string; member: Group
   const [mode, setMode] = useState<Mode>("idle");
   const [error, setError] = useState<string | null>(null);
   const [removing, startRemove] = useTransition();
+  const [loggingInAs, startLoginAs] = useTransition();
   const shown = useDisplayName();
 
   return (
@@ -65,6 +67,21 @@ export function MemberCard({ groupId, member }: { groupId: string; member: Group
 
       {mode === "idle" && (
         <div className="mt-3 space-y-2">
+          {member.active && member.hasLogin && (
+            <Button
+              variant="secondary"
+              block
+              disabled={loggingInAs}
+              onClick={() =>
+                startLoginAs(async () => {
+                  const result = await loginAsLeader(member.id);
+                  if (result?.error) setError(result.error);
+                })
+              }
+            >
+              {loggingInAs ? "Opening…" : "Login as"}
+            </Button>
+          )}
           <Button variant="secondary" block onClick={() => setMode("details")}>
             Edit details
           </Button>

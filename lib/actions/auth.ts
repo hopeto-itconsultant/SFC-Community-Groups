@@ -4,13 +4,15 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { getRealUser, requireUser } from "@/lib/auth";
+import { isUuid } from "@/lib/data-access";
 import {
   loginEmailForProfile,
   looksLikeMobile,
   normalizeMobile,
   normalizeUsername,
 } from "@/lib/login-id";
+import { clearLoginAsProfileId, getLoginAsProfileId, setLoginAsProfileId } from "@/lib/login-as";
 import { passwordProblem } from "@/lib/passwords";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearedRememberCookie, rememberCookie } from "@/lib/supabase/remember";
@@ -69,6 +71,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   // Set before sign-in so the auth cookies written in this request follow the choice.
   const remember = formData.get("remember") === "on";
   await setRememberPreference(remember);
+  await clearLoginAsProfileId();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -97,14 +100,51 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
 
 export async function signOut(): Promise<void> {
   await clearRememberPreference();
+  await clearLoginAsProfileId();
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
 }
 
+/**
+ * Admin-only: view the app as this leader or asst. leader (no password, no OTP).
+ * Keeps the Admin Auth session and sets an httpOnly overlay cookie.
+ */
+export async function loginAsLeader(profileId: string): Promise<{ error?: string }> {
+  const admin = await getRealUser();
+  if (!admin || admin.role !== "admin") return { error: "Only the Admin can do that." };
+  if (!isUuid(profileId)) return { error: "Could not find that person." };
+
+  const db = createAdminClient();
+  const { data: profile, error } = await db
+    .from("profiles")
+    .select("id, active, is_admin, auth_user_id, group_leaders(role)")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (error) return { error: "Could not open that login. Try again." };
+  if (!profile || !profile.active || profile.is_admin) return { error: "Could not find that person." };
+  if (!profile.auth_user_id) return { error: "Set up a login for this person first." };
+  const memberships = profile.group_leaders ?? [];
+  if (!memberships.length) return { error: "This person is not a leader or assistant leader." };
+
+  await setLoginAsProfileId(profile.id);
+  revalidatePath("/", "layout");
+  redirect("/home");
+}
+
+/** Ends Admin login-as and restores the Admin view. */
+export async function returnToAdmin(): Promise<void> {
+  const admin = await getRealUser();
+  if (!admin || admin.role !== "admin") redirect("/home");
+  await clearLoginAsProfileId();
+  revalidatePath("/", "layout");
+  redirect("/people");
+}
+
 /** Saves whether titles such as "Bro." show before names on the signed-in person's own screens. */
 export async function setShowSalutations(show: boolean): Promise<{ error?: string }> {
   await requireUser();
+  if (await getLoginAsProfileId()) return { error: "Back to admin before changing this setting." };
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_show_salutations", { show });
   if (error) return { error: "Could not save. Try again." };
@@ -129,6 +169,7 @@ function createPasswordCheckClient() {
 /** Replaces the signed-in person's password. Does not change anyone else's login. */
 export async function changePassword(_prev: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
   await requireUser();
+  if (await getLoginAsProfileId()) return { error: "Back to admin before changing the password." };
 
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
