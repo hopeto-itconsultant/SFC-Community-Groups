@@ -2,11 +2,19 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { CurrentUser, Role } from "@/data/types";
-import { SHOW_NAME_SALUTATIONS } from "@/lib/config";
+import { SHOW_NAME_SALUTATIONS, SUPERADMIN } from "@/lib/config";
 import { isUuid } from "@/lib/data-access";
 import { displayName } from "@/lib/format";
 import { clearLoginAsProfileId, getLoginAsProfileId } from "@/lib/login-as";
 import { createClient } from "@/lib/supabase/server";
+
+async function clearStaleLoginAs(): Promise<void> {
+  try {
+    await clearLoginAsProfileId();
+  } catch {
+    // Server Components cannot always set cookies; the next action will clear it.
+  }
+}
 
 interface ProfileRow {
   id: string;
@@ -80,17 +88,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const real = await getRealUser();
   if (!real) return null;
   if (real.role !== "admin") return real;
+  if (!SUPERADMIN) {
+    if (await getLoginAsProfileId()) await clearStaleLoginAs();
+    return real;
+  }
 
   const targetId = await getLoginAsProfileId();
   if (!targetId) return real;
 
   const target = await loadLoginAsTarget(targetId);
   if (!target) {
-    try {
-      await clearLoginAsProfileId();
-    } catch {
-      // Server Components cannot always set cookies; the next action will clear it.
-    }
+    await clearStaleLoginAs();
     return real;
   }
 
@@ -99,6 +107,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
 /** When an Admin is viewing as someone else, the overlay target's display name. */
 export const getLoginAsLabel = cache(async (): Promise<string | null> => {
+  if (!SUPERADMIN) return null;
   const real = await getRealUser();
   if (!real || real.role !== "admin") return null;
   const targetId = await getLoginAsProfileId();

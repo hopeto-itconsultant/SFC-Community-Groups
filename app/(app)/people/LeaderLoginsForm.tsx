@@ -8,6 +8,7 @@ import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, EmptyState, SectionTitle } from "@/components/ui";
 import { loginAsLeader } from "@/lib/actions/auth";
 import { addRosterMember, resetLeaderPassword, saveLeaderRecord, type AddMemberState, type IssuedLogin } from "@/lib/actions/people";
+import { SUPERADMIN } from "@/lib/config";
 import { DEFAULT_COUNTRY_ISO, combineMobile, splitMobile } from "@/lib/countries";
 import type { LeaderRosterGroup, LeaderRosterMember } from "@/lib/data-access";
 import { useDisplayName } from "@/lib/session";
@@ -367,7 +368,7 @@ function PeopleTable({
                   </span>
                   {row.groups.some((group) => group.status === "closed") && <Badge tone="slate">Closed</Badge>}
                 </span>
-                {row.active && row.hasLogin && (
+                {SUPERADMIN && row.active && row.hasLogin && (
                   <button
                     type="button"
                     disabled={pending}

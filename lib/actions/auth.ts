@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRealUser, requireUser } from "@/lib/auth";
+import { SUPERADMIN } from "@/lib/config";
 import { isUuid } from "@/lib/data-access";
 import {
   loginEmailForProfile,
@@ -111,6 +112,7 @@ export async function signOut(): Promise<void> {
  * Keeps the Admin Auth session and sets an httpOnly overlay cookie.
  */
 export async function loginAsLeader(profileId: string): Promise<{ error?: string }> {
+  if (!SUPERADMIN) return { error: "This feature is turned off." };
   const admin = await getRealUser();
   if (!admin || admin.role !== "admin") return { error: "Only the Admin can do that." };
   if (!isUuid(profileId)) return { error: "Could not find that person." };
