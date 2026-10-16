@@ -93,10 +93,8 @@ export default async function SettingsPage() {
             </span>
             <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
           </Link>
-          <a
+          <Link
             href="/guide"
-            target="_blank"
-            rel="noopener"
             className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
           >
             <span className="min-w-0 flex-1">
@@ -104,7 +102,7 @@ export default async function SettingsPage() {
               <span className="block text-sm text-slate-500">How to use the app</span>
             </span>
             <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
-          </a>
+          </Link>
         </div>
 
         <InstallAppLink />
