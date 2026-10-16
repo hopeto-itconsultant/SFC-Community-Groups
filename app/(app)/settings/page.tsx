@@ -3,23 +3,25 @@ import { ChevronRightIcon, LogOutIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, Button, Card, InfoRow, SectionTitle } from "@/components/ui";
 import { signOut } from "@/lib/actions/auth";
-import { requireUser } from "@/lib/auth";
+import { getRealUser, requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
-import { SUPERADMIN } from "@/lib/config";
 import { getGroupById } from "@/lib/data-access";
 import { ROLE_LABELS, displayName } from "@/lib/format";
+import { isAdminRole, isSuperAdmin } from "@/lib/roles";
 import { InstallAppLink } from "./InstallAppLink";
 import { SalutationToggle } from "./SalutationToggle";
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  const [user, real] = await Promise.all([requireUser(), getRealUser()]);
   const group = await getGroupById(user.groupId);
+  const showAdminBlock = isAdminRole(user.role);
+  const showActivity = !!real && isSuperAdmin(real.role) && isAdminRole(user.role);
 
   return (
     <>
       <PageHeader title="Settings" />
       <div className="p-4">
-        {user.role === "admin" && (
+        {showAdminBlock && (
           <div className="space-y-2">
             <Link
               href="/people"
@@ -41,7 +43,7 @@ export default async function SettingsPage() {
               </span>
               <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
             </Link>
-            {SUPERADMIN && (
+            {showActivity && (
               <Link
                 href="/activity"
                 className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"

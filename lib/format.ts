@@ -166,6 +166,7 @@ export const FREQUENCY_LABELS: Record<Frequency, string> = {
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
+  superadmin: "Admin",
   admin: "Admin",
   leader: "Leader",
   "asst-leader": "Asst. Leader",

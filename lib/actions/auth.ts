@@ -6,8 +6,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { recordError, recordSuccess } from "@/lib/activity-log";
 import { getRealUser, requireUser } from "@/lib/auth";
-import { SUPERADMIN } from "@/lib/config";
 import { isUuid } from "@/lib/data-access";
+import { isSuperAdmin } from "@/lib/roles";
 import {
   loginEmailForProfile,
   looksLikeMobile,
@@ -132,16 +132,15 @@ export async function signOut(): Promise<void> {
  * Keeps the Admin Auth session and sets an httpOnly overlay cookie.
  */
 export async function loginAsLeader(profileId: string): Promise<{ error?: string }> {
-  if (!SUPERADMIN) return { error: "This feature is turned off." };
   const admin = await getRealUser();
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !isSuperAdmin(admin.role)) {
     recordError({
       feature: "auth",
       action: "login_as",
       summary: "Login as failed",
-      errorMessage: "Only the Admin can do that.",
+      errorMessage: "Only a superadmin can do that.",
     });
-    return { error: "Only the Admin can do that." };
+    return { error: "Only a superadmin can do that." };
   }
   if (!isUuid(profileId)) {
     recordError({
@@ -156,7 +155,7 @@ export async function loginAsLeader(profileId: string): Promise<{ error?: string
   const db = createAdminClient();
   const { data: profile, error } = await db
     .from("profiles")
-    .select("id, name, active, is_admin, auth_user_id, group_leaders(role)")
+    .select("id, name, active, is_admin, is_superadmin, auth_user_id, group_leaders(role)")
     .eq("id", profileId)
     .maybeSingle();
   if (error) {
@@ -168,7 +167,7 @@ export async function loginAsLeader(profileId: string): Promise<{ error?: string
     });
     return { error: "Could not open that login. Try again." };
   }
-  if (!profile || !profile.active || profile.is_admin) {
+  if (!profile || !profile.active || profile.is_admin || profile.is_superadmin) {
     recordError({
       feature: "auth",
       action: "login_as",
@@ -213,12 +212,11 @@ export async function loginAsLeader(profileId: string): Promise<{ error?: string
 /** Ends Admin login-as and restores the Admin view. */
 export async function returnToAdmin(): Promise<void> {
   const admin = await getRealUser();
-  if (!admin || admin.role !== "admin") redirect("/home");
+  if (!admin || !isSuperAdmin(admin.role)) redirect("/home");
   recordSuccess({ feature: "auth", action: "return_to_admin", summary: "Returned to admin" });
   await clearLoginAsProfileId();
   revalidatePath("/", "layout");
-  // Banner only shows when SUPERADMIN is on; still clear the cookie if the flag was turned off.
-  redirect(SUPERADMIN ? "/people" : "/home");
+  redirect("/people");
 }
 
 /** Saves whether titles such as "Bro." show before names on the signed-in person's own screens. */

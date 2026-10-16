@@ -8,7 +8,6 @@ import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, ConfirmCard } from "@/components/ui";
 import { loginAsLeader } from "@/lib/actions/auth";
 import { type LoginState, type MemberDetailsState, removeMember, setLogin, updateMemberDetails } from "@/lib/actions/people";
-import { SUPERADMIN } from "@/lib/config";
 import { copyText } from "@/lib/copy-text";
 import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
 import type { GroupMember } from "@/lib/data-access";
@@ -18,7 +17,15 @@ import { DEFAULT_PASSWORD, passwordProblem } from "@/lib/passwords";
 
 type Mode = "idle" | "login" | "details" | "remove";
 
-export function MemberCard({ groupId, member }: { groupId: string; member: GroupMember }) {
+export function MemberCard({
+  groupId,
+  member,
+  canLoginAs = false,
+}: {
+  groupId: string;
+  member: GroupMember;
+  canLoginAs?: boolean;
+}) {
   const [mode, setMode] = useState<Mode>("idle");
   const [error, setError] = useState<string | null>(null);
   const [removing, startRemove] = useTransition();
@@ -68,7 +75,7 @@ export function MemberCard({ groupId, member }: { groupId: string; member: Group
 
       {mode === "idle" && (
         <div className="mt-3 space-y-2">
-          {SUPERADMIN && member.active && member.hasLogin && (
+          {canLoginAs && member.active && member.hasLogin && (
             <Button
               variant="secondary"
               block

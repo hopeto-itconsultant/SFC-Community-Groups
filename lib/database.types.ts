@@ -176,6 +176,7 @@ export type Database = {
           email: string | null
           id: string
           is_admin: boolean
+          is_superadmin: boolean
           mobile: string | null
           name: string
           serving_since: string | null
@@ -191,6 +192,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean
+          is_superadmin?: boolean
           mobile?: string | null
           name: string
           serving_since?: string | null
@@ -206,6 +208,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean
+          is_superadmin?: boolean
           mobile?: string | null
           name?: string
           serving_since?: string | null
@@ -325,6 +328,7 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      is_superadmin: { Args: never; Returns: boolean }
       is_group_member: { Args: { group_id: string }; Returns: boolean }
       report_is_latest: { Args: { p_report_id: string }; Returns: boolean }
       report_type_summaries: { Args: { p_group_id?: string }; Returns: Json }

@@ -7,6 +7,7 @@ import { recordError, recordSuccess } from "@/lib/activity-log";
 import { getCurrentUser } from "@/lib/auth";
 import { getGroupById } from "@/lib/data-access";
 import { canEditGroup, isGroupClosed } from "@/lib/report-rules";
+import { isAdminRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { photoFiles, removePhotos, uploadPhotos } from "@/lib/uploads";
 import type { FormState } from "./types";
@@ -47,7 +48,9 @@ async function uploadGroupPhoto(supabase: Awaited<ReturnType<typeof createClient
 export async function createGroup(_prev: FormState, formData: FormData): Promise<FormState> {
   const action = "group_create";
   const user = await getCurrentUser();
-  if (user?.role !== "admin") return groupFail(action, "Group create failed", "Only the Admin can add groups.");
+  if (!user || !isAdminRole(user.role)) {
+    return groupFail(action, "Group create failed", "Only the Admin can add groups.");
+  }
 
   const parsed = parseGroup(formData);
   if (!parsed.success) return groupFail(action, "Group create failed", parsed.error.issues[0].message);
@@ -102,7 +105,7 @@ export async function updateGroup(groupId: string, _prev: FormState, formData: F
     .update({
       ...details,
       // Only the Admin decides how often a group meets.
-      ...(user.role === "admin" ? { frequency } : {}),
+      ...(isAdminRole(user.role) ? { frequency } : {}),
       ...(photo.path ? { photo_path: photo.path } : {}),
       updated_by: user.id,
     })
@@ -121,13 +124,15 @@ export async function updateGroup(groupId: string, _prev: FormState, formData: F
     entityId: groupId,
   });
   revalidatePath("/", "layout");
-  redirect(user.role === "admin" ? `/groups/${groupId}?saved=updated` : "/group?saved=updated");
+  redirect(isAdminRole(user.role) ? `/groups/${groupId}?saved=updated` : "/group?saved=updated");
 }
 
 export async function closeGroup(groupId: string): Promise<FormState> {
   const action = "group_close";
   const user = await getCurrentUser();
-  if (user?.role !== "admin") return groupFail(action, "Group close failed", "Only the Admin can close groups.");
+  if (!user || !isAdminRole(user.role)) {
+    return groupFail(action, "Group close failed", "Only the Admin can close groups.");
+  }
 
   const group = await getGroupById(groupId);
   const supabase = await createClient();

@@ -17,6 +17,7 @@ import { ReportLayoutSwitch } from "@/components/ViewToggle";
 import { getGroupById, getGroups, getReportTypeSummaries, getReports } from "@/lib/data-access";
 import { CONTACT_MODES, formatRupees } from "@/lib/format";
 import { getReportDate, type ReportPeriod } from "@/lib/report-rules";
+import { isAdminRole } from "@/lib/roles";
 import { GroupSelect } from "./GroupSelect";
 import { type ReportsParams, reportsHref } from "./hrefs";
 
@@ -34,7 +35,7 @@ const PERIOD_TITLES: Record<ReportPeriod, string> = {
 
 /** Admins pick any group (or all); leaders and asst. leaders are fixed to their own. */
 async function groupScope(user: User, requestedGroupId: string | undefined) {
-  const isAdmin = user.role === "admin";
+  const isAdmin = isAdminRole(user.role);
   const group = await getGroupById(isAdmin ? requestedGroupId : user.groupId);
   return {
     isAdmin,

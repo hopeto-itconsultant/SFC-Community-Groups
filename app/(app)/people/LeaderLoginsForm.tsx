@@ -8,7 +8,6 @@ import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, EmptyState, SectionTitle } from "@/components/ui";
 import { loginAsLeader } from "@/lib/actions/auth";
 import { addRosterMember, resetLeaderPassword, saveLeaderRecord, type AddMemberState, type IssuedLogin } from "@/lib/actions/people";
-import { SUPERADMIN } from "@/lib/config";
 import { DEFAULT_COUNTRY_ISO, combineMobile, splitMobile } from "@/lib/countries";
 import type { LeaderRosterGroup, LeaderRosterMember } from "@/lib/data-access";
 import { useDisplayName } from "@/lib/session";
@@ -104,7 +103,15 @@ function loginStatus(row: RosterRow): string {
   return row.hasLogin ? "Has login" : "No login";
 }
 
-export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup[]; groups: GroupOption[] }) {
+export function LeaderLoginsForm({
+  roster,
+  groups,
+  canLoginAs = false,
+}: {
+  roster: LeaderRosterGroup[];
+  groups: GroupOption[];
+  canLoginAs?: boolean;
+}) {
   const [phoneEdits, setPhoneEdits] = useState<Record<string, PhoneEntry>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -258,6 +265,7 @@ export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup
     unchangedIds,
     confirmResetId,
     loginAsId,
+    canLoginAs,
     onPhone: setPhone,
     onSave: saveRow,
     onAskReset: (row: RosterRow) => {
@@ -309,6 +317,7 @@ function PeopleTable({
   unchangedIds,
   confirmResetId,
   loginAsId,
+  canLoginAs,
   onPhone,
   onSave,
   onAskReset,
@@ -327,6 +336,7 @@ function PeopleTable({
   unchangedIds: Record<string, boolean>;
   confirmResetId: string | null;
   loginAsId: string | null;
+  canLoginAs: boolean;
   onPhone: (id: string, national: string) => void;
   onSave: (row: RosterRow) => void;
   onAskReset: (row: RosterRow) => void;
@@ -368,7 +378,7 @@ function PeopleTable({
                   </span>
                   {row.groups.some((group) => group.status === "closed") && <Badge tone="slate">Closed</Badge>}
                 </span>
-                {SUPERADMIN && row.active && row.hasLogin && (
+                {canLoginAs && row.active && row.hasLogin && (
                   <button
                     type="button"
                     disabled={pending}

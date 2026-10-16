@@ -15,9 +15,17 @@ import {
   normalizeUsername,
 } from "@/lib/login-id";
 import { DEFAULT_PASSWORD, passwordProblem } from "@/lib/passwords";
+import { isAdminRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "./types";
+
+/** Collision copy that never reveals a superadmin's display name. */
+function alreadyUsedMessage(value: string, other: { name: string; is_superadmin?: boolean } | null): string | null {
+  if (!other) return null;
+  if (other.is_superadmin) return `${value} is already used.`;
+  return `${value} is already used by ${other.name}.`;
+}
 
 function trackFail(
   feature: ActivityFeature,
@@ -75,7 +83,8 @@ export interface SaveLoginsState {
 }
 
 async function isAdmin(): Promise<boolean> {
-  return (await getCurrentUser())?.role === "admin";
+  const user = await getCurrentUser();
+  return !!user && isAdminRole(user.role);
 }
 
 /**
@@ -86,7 +95,7 @@ async function isAdmin(): Promise<boolean> {
 async function memberDetailsBlock(profileId: string): Promise<string | null> {
   const user = await getCurrentUser();
   if (!user) return "Only the Admin can edit leaders.";
-  if (user.role === "admin") return null;
+  if (isAdminRole(user.role)) return null;
   if (user.role !== "leader") return "Only the Admin can edit leaders.";
 
   const supabase = await createClient();
@@ -422,11 +431,12 @@ export async function setLogin(profileId: string, _prev: LoginState, formData: F
     if (nextMobile && nextMobile !== profile.mobile) {
       const { data: other } = await admin
         .from("profiles")
-        .select("name")
+        .select("name, is_superadmin")
         .eq("mobile", nextMobile)
         .neq("id", profileId)
         .maybeSingle();
-      if (other) return fail(`${nextMobile} is already used by ${other.name}.`);
+      const taken = alreadyUsedMessage(nextMobile, other);
+      if (taken) return fail(taken);
     }
 
     const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, { password });
@@ -457,11 +467,12 @@ export async function setLogin(profileId: string, _prev: LoginState, formData: F
 
   const { data: other } = await admin
     .from("profiles")
-    .select("name")
+    .select("name, is_superadmin")
     .eq("mobile", mobile)
     .neq("id", profileId)
     .maybeSingle();
-  if (other) return fail(`${mobile} is already used by ${other.name}.`);
+  const taken = alreadyUsedMessage(mobile, other);
+  if (taken) return fail(taken);
 
   const message = await writeLogin(admin, profile, mobile, password);
   if (message) return fail(message);
@@ -504,11 +515,21 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
 
   const name = parsedName.data || username;
   const admin = createAdminClient();
-  const { data: takenUsername } = await admin.from("profiles").select("name").eq("username", username).maybeSingle();
-  if (takenUsername) return fail(`${username} is already used by ${takenUsername.name}.`);
+  const { data: takenUsername } = await admin
+    .from("profiles")
+    .select("name, is_superadmin")
+    .eq("username", username)
+    .maybeSingle();
+  const usernameTaken = alreadyUsedMessage(username, takenUsername);
+  if (usernameTaken) return fail(usernameTaken);
   if (mobile) {
-    const { data: takenMobile } = await admin.from("profiles").select("name").eq("mobile", mobile).maybeSingle();
-    if (takenMobile) return fail(`${mobile} is already used by ${takenMobile.name}.`);
+    const { data: takenMobile } = await admin
+      .from("profiles")
+      .select("name, is_superadmin")
+      .eq("mobile", mobile)
+      .maybeSingle();
+    const mobileTaken = alreadyUsedMessage(mobile, takenMobile);
+    if (mobileTaken) return fail(mobileTaken);
   }
 
   const { data: created, error } = await admin.auth.admin.createUser({
@@ -524,6 +545,7 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
     username,
     mobile,
     is_admin: true,
+    is_superadmin: false,
   });
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);
@@ -561,10 +583,10 @@ export async function setAdminActive(profileId: string, active: boolean): Promis
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("id, name, is_admin, active")
+    .select("id, name, is_admin, is_superadmin, active")
     .eq("id", profileId)
     .maybeSingle();
-  if (profileError || !profile?.is_admin) {
+  if (profileError || !profile?.is_admin || profile.is_superadmin) {
     trackFail("admins", action, "Admin active change failed", "Could not find that admin.");
     return { error: "Could not find that admin." };
   }
@@ -574,6 +596,7 @@ export async function setAdminActive(profileId: string, active: boolean): Promis
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("is_admin", true)
+      .eq("is_superadmin", false)
       .eq("active", true);
     if (countError) {
       trackFail("admins", action, "Admin active change failed", `Could not check admins: ${countError.message}`);
@@ -609,6 +632,7 @@ interface LoginTarget {
   auth_user_id: string | null;
   active: boolean;
   is_admin: boolean;
+  is_superadmin: boolean;
 }
 
 const personNameSchema = z.string().trim().min(1, "Enter the person's name.").max(100, "Use a shorter name.");
@@ -653,10 +677,12 @@ export async function saveLeaderRecord(input: {
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("id, name, mobile, auth_user_id, active, is_admin")
+    .select("id, name, mobile, auth_user_id, active, is_admin, is_superadmin")
     .eq("id", input.profileId)
     .maybeSingle();
-  if (profileError || !profile || profile.is_admin || !profile.active) return fail("Could not find that person.");
+  if (profileError || !profile || profile.is_admin || profile.is_superadmin || !profile.active) {
+    return fail("Could not find that person.");
+  }
 
   const name = parsed.data;
   const phoneChanged = Boolean(mobile) && mobile !== profile.mobile;
@@ -723,10 +749,12 @@ export async function resetLeaderPassword(profileId: string): Promise<{ error?: 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("id, name, mobile, auth_user_id, active, is_admin")
+    .select("id, name, mobile, auth_user_id, active, is_admin, is_superadmin")
     .eq("id", profileId)
     .maybeSingle();
-  if (profileError || !profile || profile.is_admin || !profile.active) return fail("Could not find that person.");
+  if (profileError || !profile || profile.is_admin || profile.is_superadmin || !profile.active) {
+    return fail("Could not find that person.");
+  }
   if (!profile.auth_user_id || !profile.mobile) return fail("This person does not have a login yet.");
 
   const password = DEFAULT_PASSWORD;
@@ -746,8 +774,13 @@ export async function resetLeaderPassword(profileId: string): Promise<{ error?: 
 
 /** An error message when another person already uses this mobile, or null. */
 async function mobileTakenBy(admin: AdminClient, mobile: string, profileId: string): Promise<string | null> {
-  const { data: other } = await admin.from("profiles").select("name").eq("mobile", mobile).neq("id", profileId).maybeSingle();
-  return other ? `${mobile} is already used by ${other.name}.` : null;
+  const { data: other } = await admin
+    .from("profiles")
+    .select("name, is_superadmin")
+    .eq("mobile", mobile)
+    .neq("id", profileId)
+    .maybeSingle();
+  return alreadyUsedMessage(mobile, other);
 }
 
 /**
@@ -806,7 +839,7 @@ export async function saveLeaderLogins(input: {
   const ids = [...new Set([...mobileByProfile.keys(), ...nameByProfile.keys()])];
   const { data: profiles, error: profileError } = await admin
     .from("profiles")
-    .select("id, name, mobile, auth_user_id, active, is_admin")
+    .select("id, name, mobile, auth_user_id, active, is_admin, is_superadmin")
     .in("id", ids);
   if (profileError) return { error: `Could not load people: ${profileError.message}` };
 
@@ -818,7 +851,7 @@ export async function saveLeaderLogins(input: {
       if (renamed.length) revalidatePath("/", "layout");
       return { error: "Could not find that person." };
     }
-    if (profile.is_admin || !profile.active || profile.name === entry.name) continue;
+    if (profile.is_admin || profile.is_superadmin || !profile.active || profile.name === entry.name) continue;
     const { error } = await admin.from("profiles").update({ name: entry.name }).eq("id", profile.id);
     if (error) {
       if (renamed.length) revalidatePath("/", "layout");
@@ -836,7 +869,7 @@ export async function saveLeaderLogins(input: {
 
   const { data: holders, error: holderError } = await admin
     .from("profiles")
-    .select("id, name, mobile")
+    .select("id, name, mobile, is_superadmin")
     .in("mobile", [...ownerByMobile.keys()]);
   if (holderError) {
     if (renamed.length) revalidatePath("/", "layout");
@@ -850,13 +883,13 @@ export async function saveLeaderLogins(input: {
     const movingTo = mobileByProfile.get(holder.id);
     if (movingTo && movingTo !== holder.mobile) continue;
     if (renamed.length) revalidatePath("/", "layout");
-    return { error: `${holder.mobile} is already used by ${holder.name}.` };
+    return { error: alreadyUsedMessage(holder.mobile, holder) ?? `${holder.mobile} is already used.` };
   }
 
   const pending: LoginTarget[] = [];
   for (const id of mobileByProfile.keys()) {
     const profile = profileById.get(id);
-    if (!profile || profile.is_admin || !profile.active) continue;
+    if (!profile || profile.is_admin || profile.is_superadmin || !profile.active) continue;
     pending.push(profile);
   }
   if (!pending.length) {

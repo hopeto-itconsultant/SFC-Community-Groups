@@ -67,7 +67,7 @@ async function sessionFor(profile) {
 async function pickSubjects() {
   const db = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
   const [profilesRes, membersRes, groupsRes, reportsRes] = await Promise.all([
-    db.from("profiles").select("id, name, is_admin, active, auth_user_id, username, mobile"),
+    db.from("profiles").select("id, name, is_admin, is_superadmin, active, auth_user_id, username, mobile"),
     db.from("group_leaders").select("profile_id, group_id, role"),
     db.from("groups").select("id, name, status"),
     db.from("reports").select("id, group_id, type"),
@@ -89,7 +89,14 @@ async function pickSubjects() {
     }))
     .sort((a, b) => b.score - a.score);
   const leader = leaders[0];
-  const admin = profilesRes.data.find((person) => person.is_admin && person.active && person.auth_user_id && loginEmail(person));
+  const admin = profilesRes.data.find(
+    (person) =>
+      person.is_admin &&
+      !person.is_superadmin &&
+      person.active &&
+      person.auth_user_id &&
+      loginEmail(person),
+  );
   if (!leader || !admin) throw new Error("Need a leader and an admin with logins.");
   return { leader: leader.profile, admin, groupName: leader.group.name };
 }

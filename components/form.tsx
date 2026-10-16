@@ -3,7 +3,7 @@ import type { CommunityGroup, CurrentUser, Role } from "@/data/types";
 import { ROLE_LABELS, displayName, formatDate, todayISO } from "@/lib/format";
 import { Badge, Button, Card } from "./ui";
 
-export const LEADER_ROLES: Role[] = ["leader", "asst-leader"];
+export const LEADER_ROLES: Exclude<Role, "admin" | "superadmin">[] = ["leader", "asst-leader"];
 
 /** Leader or assistant leader, chosen with one tap. */
 export const GROUP_ROLE_OPTIONS = LEADER_ROLES.map((role) => ({

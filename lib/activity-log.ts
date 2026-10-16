@@ -2,8 +2,8 @@ import "server-only";
 
 import { after } from "next/server";
 import { getCurrentUser, getRealUser } from "@/lib/auth";
-import { SUPERADMIN } from "@/lib/config";
 import { getLoginAsProfileId } from "@/lib/login-as";
+import { isSuperAdmin } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ActivityFeature = "auth" | "reports" | "groups" | "people" | "admins";
@@ -30,13 +30,16 @@ function clip(text: string | null | undefined, max = 300): string | null {
   return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
 }
 
+async function callerIsSuperAdmin(): Promise<boolean> {
+  const real = await getRealUser();
+  return !!real && isSuperAdmin(real.role);
+}
+
 /**
- * Records one activity row when SUPERADMIN is on. Schedules the insert with
- * `after()` so the user-facing action is not delayed. No-op when the flag is off.
+ * Records one activity row. Schedules the insert with `after()` so the
+ * user-facing action is not delayed.
  */
 export function recordActivity(entry: ActivityEntry): void {
-  if (!SUPERADMIN) return;
-
   const summary = clip(entry.summary) ?? entry.action;
   const errorMessage = entry.outcome === "error" ? clip(entry.errorMessage) : null;
   const hasActor = Object.prototype.hasOwnProperty.call(entry, "actorId");
@@ -122,9 +125,9 @@ export function featureLabel(feature: string): string {
   return FEATURE_LABELS[feature] ?? feature;
 }
 
-/** Last 7 days of usage counts — call only from the SUPERADMIN activity page. */
+/** Last 7 days of usage counts — call only from the superadmin activity page. */
 export async function getActivityUsage(days = 7): Promise<ActivityUsageCount[]> {
-  if (!SUPERADMIN) return [];
+  if (!(await callerIsSuperAdmin())) return [];
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await createAdminClient()
     .from("activity_log")
@@ -185,9 +188,9 @@ async function mapActivityRows(
   }));
 }
 
-/** Newest activity rows — call only from the SUPERADMIN activity page. */
+/** Newest activity rows — call only from the superadmin activity page. */
 export async function getRecentActivity(limit = 100): Promise<ActivityRow[]> {
-  if (!SUPERADMIN) return [];
+  if (!(await callerIsSuperAdmin())) return [];
   const { data, error } = await createAdminClient()
     .from("activity_log")
     .select(
@@ -199,9 +202,9 @@ export async function getRecentActivity(limit = 100): Promise<ActivityRow[]> {
   return mapActivityRows(data);
 }
 
-/** Newest error rows — call only from the SUPERADMIN activity page. */
+/** Newest error rows — call only from the superadmin activity page. */
 export async function getRecentActivityErrors(limit = 20): Promise<ActivityRow[]> {
-  if (!SUPERADMIN) return [];
+  if (!(await callerIsSuperAdmin())) return [];
   const { data, error } = await createAdminClient()
     .from("activity_log")
     .select(

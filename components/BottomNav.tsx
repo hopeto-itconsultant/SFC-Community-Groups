@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { type ComponentType, type SVGProps, useEffect, useState } from "react";
 import type { Role } from "@/data/types";
 import { isConstrainedNetwork } from "@/lib/network";
+import { isAdminRole } from "@/lib/roles";
 import { FileTextIcon, GridIcon, HomeIcon, SettingsIcon, UsersIcon } from "./icons";
 
 interface NavItem {
@@ -35,7 +36,7 @@ function matches(pathname: string, prefix: string) {
 
 export function BottomNav({ role }: { role: Role }) {
   const pathname = usePathname();
-  const items = role === "admin" ? ADMIN_NAV : LEADER_NAV;
+  const items = isAdminRole(role) ? ADMIN_NAV : LEADER_NAV;
   // Tabs prefetch only once the open screen has loaded, and never on slow or data-saver connections.
   const [prefetch, setPrefetch] = useState(false);
 

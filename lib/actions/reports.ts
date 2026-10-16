@@ -10,6 +10,7 @@ import { getGroupById, getReportById, hasFellowshipOnDate, isLatestFiledReport }
 import { combineDateAndTime, startOfDayTimestamp, todayISO } from "@/lib/format";
 import { MAX_PHOTOS, storagePath } from "@/lib/photos";
 import { canEditFiledReport, canEditPlan, isGroupClosed } from "@/lib/report-rules";
+import { isAdminRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { photoFiles, removePhotos, uploadPhotos } from "@/lib/uploads";
 import type { FormState } from "./types";
@@ -33,7 +34,7 @@ const count = z.coerce.number().int("Enter a whole number.").min(0, "Numbers can
 async function reportingContext(): Promise<{ user: User; group: CommunityGroup } | { error: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Your session has ended. Please sign in again." };
-  const group = user.role === "admin" ? undefined : await getGroupById(user.groupId);
+  const group = isAdminRole(user.role) ? undefined : await getGroupById(user.groupId);
   if (!group) return { error: "Only group leaders can file reports." };
   if (isGroupClosed(group)) return { error: `${group.name} is closed, so no new reports can be filed.` };
   return { user, group };

@@ -1,4 +1,4 @@
-export type Role = "admin" | "leader" | "asst-leader";
+export type Role = "superadmin" | "admin" | "leader" | "asst-leader";
 
 export type Frequency = "monthly" | "every-2-months";
 

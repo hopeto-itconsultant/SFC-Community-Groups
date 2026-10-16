@@ -1,7 +1,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
 import { EmptyState, SectionTitle } from "@/components/ui";
+import { getRealUser } from "@/lib/auth";
 import { getGroupById, getGroupMembers } from "@/lib/data-access";
+import { isSuperAdmin } from "@/lib/roles";
 import { AddMemberForm } from "./AddMemberForm";
 import { MemberCard } from "./MemberCard";
 
@@ -17,7 +19,8 @@ export default async function GroupPeoplePage({ params }: PageProps<"/groups/[id
 async function GroupPeople({ id }: { id: string }) {
   const group = await getGroupById(id);
   if (!group) return <NotAvailable message="This group could not be found." />;
-  const members = await getGroupMembers(group.id);
+  const [members, real] = await Promise.all([getGroupMembers(group.id), getRealUser()]);
+  const canLoginAs = !!real && isSuperAdmin(real.role);
 
   return (
     <>
@@ -31,7 +34,7 @@ async function GroupPeople({ id }: { id: string }) {
         {members.length ? (
           <div className="space-y-2">
             {members.map((m) => (
-              <MemberCard key={m.id} groupId={group.id} member={m} />
+              <MemberCard key={m.id} groupId={group.id} member={m} canLoginAs={canLoginAs} />
             ))}
           </div>
         ) : (

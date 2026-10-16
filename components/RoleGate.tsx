@@ -1,13 +1,20 @@
 import type { ReactNode } from "react";
 import type { Role } from "@/data/types";
 import { requireUser } from "@/lib/auth";
+import { isAdminRole } from "@/lib/roles";
 import { PageHeader } from "./PageHeader";
 import { EmptyState, LinkButton } from "./ui";
+
+function roleAllowed(role: Role, allow: Role[]): boolean {
+  if (allow.includes(role)) return true;
+  // Screens that allow "admin" also allow superadmin.
+  return isAdminRole(role) && allow.includes("admin");
+}
 
 /** Renders `children` (and so loads their data) only for the allowed roles. */
 export async function RoleGate({ allow, children }: { allow: Role[]; children: ReactNode }) {
   const user = await requireUser();
-  if (allow.includes(user.role)) return <>{children}</>;
+  if (roleAllowed(user.role, allow)) return <>{children}</>;
   return <NotAvailable />;
 }
 

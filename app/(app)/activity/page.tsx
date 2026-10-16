@@ -10,17 +10,14 @@ import {
   type ActivityUsageCount,
 } from "@/lib/activity-log";
 import { getRealUser } from "@/lib/auth";
-import { SUPERADMIN } from "@/lib/config";
 import { ROLE_LABELS, displayName } from "@/lib/format";
+import { isSuperAdmin } from "@/lib/roles";
 import type { Role } from "@/data/types";
 
 export default async function ActivityPage() {
-  if (!SUPERADMIN) {
-    return <NotAvailable message="Activity log is turned off." />;
-  }
   const real = await getRealUser();
-  if (!real || real.role !== "admin") {
-    return <NotAvailable message="Only the Admin can view the activity log." />;
+  if (!real || !isSuperAdmin(real.role)) {
+    return <NotAvailable message="Only a superadmin can view the activity log." />;
   }
 
   const [usage, errors, recent] = await Promise.all([

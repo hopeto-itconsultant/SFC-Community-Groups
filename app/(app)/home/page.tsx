@@ -18,10 +18,11 @@ import {
 } from "@/lib/data-access";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
 import { ROLE_LABELS, displayName, formatRupees, formatShortDateTime } from "@/lib/format";
+import { isAdminRole } from "@/lib/roles";
 
 export default async function HomePage() {
   const user = await requireUser();
-  if (user.role === "admin") return <AdminHome user={user} />;
+  if (isAdminRole(user.role)) return <AdminHome user={user} />;
   const group = await getGroupById(user.groupId);
   if (!group) return <NoGroupHome user={user} />;
   return <LeaderHome user={user} group={group} />;

@@ -1,6 +1,8 @@
 import { PageHeader } from "@/components/PageHeader";
 import { RoleGate } from "@/components/RoleGate";
+import { getRealUser } from "@/lib/auth";
 import { getGroups, getLeaderRoster } from "@/lib/data-access";
+import { isSuperAdmin } from "@/lib/roles";
 import { LeaderLoginsForm } from "./LeaderLoginsForm";
 
 export default async function PeoplePage() {
@@ -12,8 +14,9 @@ export default async function PeoplePage() {
 }
 
 async function PeopleScreen() {
-  const [roster, groups] = await Promise.all([getLeaderRoster(), getGroups()]);
+  const [roster, groups, real] = await Promise.all([getLeaderRoster(), getGroups(), getRealUser()]);
   const people = new Set(roster.flatMap((group) => group.members.map((member) => member.id)));
+  const canLoginAs = !!real && isSuperAdmin(real.role);
 
   return (
     <>
@@ -22,7 +25,11 @@ async function PeopleScreen() {
         subtitle={`${people.size} ${people.size === 1 ? "person" : "people"}`}
         backHref="/settings"
       />
-      <LeaderLoginsForm roster={roster} groups={groups.map((group) => ({ id: group.id, name: group.name }))} />
+      <LeaderLoginsForm
+        roster={roster}
+        groups={groups.map((group) => ({ id: group.id, name: group.name }))}
+        canLoginAs={canLoginAs}
+      />
     </>
   );
 }
