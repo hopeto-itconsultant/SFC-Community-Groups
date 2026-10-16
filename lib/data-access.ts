@@ -45,6 +45,7 @@ interface ProfileRow {
   id: string;
   name: string;
   is_admin: boolean;
+  is_superadmin: boolean;
   group_leaders: { group_id: string; role: GroupRole; created_at: string }[];
 }
 
@@ -74,7 +75,7 @@ interface ReportRow {
 
 const GROUP_COLUMNS =
   "id, name, category, frequency, photo_path, status, closed_at, group_leaders(profile_id, role, created_at)";
-const PROFILE_COLUMNS = "id, name, is_admin, group_leaders(group_id, role, created_at)";
+const PROFILE_COLUMNS = "id, name, is_admin, is_superadmin, group_leaders(group_id, role, created_at)";
 const REPORT_COLUMNS =
   "id, group_id, type, filed_by, report_date, location, comments, attendees, first_timers, summary, " +
   "expense_amount, expense_details, photo_paths, person_name, contact_mode, activity, goals, cancelled_at, created_at";
@@ -114,6 +115,7 @@ function toGroup(row: GroupRow): CommunityGroup {
 
 /** Admins have no group; anyone else takes role and group from the group they joined first. */
 function toUser(row: ProfileRow): User {
+  if (row.is_superadmin) return { id: row.id, name: row.name, role: "superadmin" };
   if (row.is_admin) return { id: row.id, name: row.name, role: "admin" };
   const first = [...row.group_leaders].sort(byCreatedAt)[0];
   return { id: row.id, name: row.name, role: first?.role ?? "leader", groupId: first?.group_id };
@@ -410,7 +412,8 @@ export async function getAdmins(): Promise<AdminAccount[]> {
     await supabase
       .from("profiles")
       .select("id, name, username, mobile, auth_user_id, active")
-      .eq("is_admin", true),
+      .eq("is_admin", true)
+      .eq("is_superadmin", false),
   );
   return rows
     .map((profile) => ({

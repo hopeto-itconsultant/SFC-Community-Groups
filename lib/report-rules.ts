@@ -10,6 +10,7 @@ import type {
   ReportType,
   User,
 } from "@/data/types";
+import { isAdminRole } from "@/lib/roles";
 import { todayISO } from "./format";
 
 export function isGroupClosed(group: CommunityGroup): boolean {
@@ -18,12 +19,12 @@ export function isGroupClosed(group: CommunityGroup): boolean {
 
 /** Admins, plus the leaders and assistant leaders of this group. */
 export function canEditGroup(user: User, group: CommunityGroup): boolean {
-  return user.role === "admin" || user.groupId === group.id;
+  return isAdminRole(user.role) || user.groupId === group.id;
 }
 
 /** Same people as `canEditGroup`, and only while the plan is upcoming and not cancelled. */
 export function canEditPlan(user: User, plan: NextFellowship): boolean {
-  return (user.role === "admin" || user.groupId === plan.groupId) && isUpcomingPlan(plan);
+  return (isAdminRole(user.role) || user.groupId === plan.groupId) && isUpcomingPlan(plan);
 }
 
 /**
@@ -38,7 +39,7 @@ export function canEditFiledReport(
   isLatest: boolean,
 ): boolean {
   if (!isLatest || group.id !== report.groupId) return false;
-  if (user.role === "admin") return true;
+  if (isAdminRole(user.role)) return true;
   return user.groupId === report.groupId && !isGroupClosed(group);
 }
 

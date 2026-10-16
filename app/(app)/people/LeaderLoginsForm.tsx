@@ -6,6 +6,7 @@ import { ChoiceField, Field, GROUP_ROLE_OPTIONS, inputClass } from "@/components
 import { LeaderDetailFields } from "@/components/LeaderDetailFields";
 import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, EmptyState, SectionTitle } from "@/components/ui";
+import { loginAsLeader } from "@/lib/actions/auth";
 import { addRosterMember, resetLeaderPassword, saveLeaderRecord, type AddMemberState, type IssuedLogin } from "@/lib/actions/people";
 import { DEFAULT_COUNTRY_ISO, combineMobile, splitMobile } from "@/lib/countries";
 import type { LeaderRosterGroup, LeaderRosterMember } from "@/lib/data-access";
@@ -102,7 +103,15 @@ function loginStatus(row: RosterRow): string {
   return row.hasLogin ? "Has login" : "No login";
 }
 
-export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup[]; groups: GroupOption[] }) {
+export function LeaderLoginsForm({
+  roster,
+  groups,
+  canLoginAs = false,
+}: {
+  roster: LeaderRosterGroup[];
+  groups: GroupOption[];
+  canLoginAs?: boolean;
+}) {
   const [phoneEdits, setPhoneEdits] = useState<Record<string, PhoneEntry>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -110,6 +119,7 @@ export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup
   const [issued, setIssued] = useState<Record<string, IssuedLogin>>({});
   const [unchangedIds, setUnchangedIds] = useState<Record<string, boolean>>({});
   const [confirmResetId, setConfirmResetId] = useState<string | null>(null);
+  const [loginAsId, setLoginAsId] = useState<string | null>(null);
   const [pending, startSave] = useTransition();
   const rosterPhones = phonesFromRoster(roster);
   const phones = { ...rosterPhones, ...phoneEdits };
@@ -230,6 +240,21 @@ export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup
     });
   }
 
+  function loginAs(row: RosterRow) {
+    if (!row.active || !row.hasLogin || pending) return;
+    setLoginAsId(row.id);
+    startSave(async () => {
+      try {
+        const result = await loginAsLeader(row.id);
+        if (result?.error) {
+          setRowErrors((current) => ({ ...current, [row.id]: result.error ?? "Could not open that login." }));
+        }
+      } finally {
+        setLoginAsId(null);
+      }
+    });
+  }
+
   const tableProps = {
     phones,
     rowErrors,
@@ -239,6 +264,8 @@ export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup
     issued,
     unchangedIds,
     confirmResetId,
+    loginAsId,
+    canLoginAs,
     onPhone: setPhone,
     onSave: saveRow,
     onAskReset: (row: RosterRow) => {
@@ -248,6 +275,7 @@ export function LeaderLoginsForm({ roster, groups }: { roster: LeaderRosterGroup
     onCancelReset: () => setConfirmResetId(null),
     onConfirmReset: confirmReset,
     onDismissLogin: dismissLogin,
+    onLoginAs: loginAs,
   };
 
   return (
@@ -288,12 +316,15 @@ function PeopleTable({
   issued,
   unchangedIds,
   confirmResetId,
+  loginAsId,
+  canLoginAs,
   onPhone,
   onSave,
   onAskReset,
   onCancelReset,
   onConfirmReset,
   onDismissLogin,
+  onLoginAs,
 }: {
   rows: RosterRow[];
   phones: Record<string, PhoneEntry>;
@@ -304,12 +335,15 @@ function PeopleTable({
   issued: Record<string, IssuedLogin>;
   unchangedIds: Record<string, boolean>;
   confirmResetId: string | null;
+  loginAsId: string | null;
+  canLoginAs: boolean;
   onPhone: (id: string, national: string) => void;
   onSave: (row: RosterRow) => void;
   onAskReset: (row: RosterRow) => void;
   onCancelReset: () => void;
   onConfirmReset: (row: RosterRow) => void;
   onDismissLogin: (id: string) => void;
+  onLoginAs: (row: RosterRow) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
@@ -344,6 +378,16 @@ function PeopleTable({
                   </span>
                   {row.groups.some((group) => group.status === "closed") && <Badge tone="slate">Closed</Badge>}
                 </span>
+                {canLoginAs && row.active && row.hasLogin && (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onLoginAs(row)}
+                    className="mt-0.5 text-left text-[11px] font-semibold text-brand-700 hover:underline disabled:opacity-50"
+                  >
+                    {loginAsId === row.id ? "Opening…" : "Login as"}
+                  </button>
+                )}
                 {error ? (
                   <p role="alert" className="mt-1 text-xs font-medium text-red-600">
                     {error}

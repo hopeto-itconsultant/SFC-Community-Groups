@@ -32,7 +32,8 @@ function fail(message) {
 const { count: adminCount, error: adminError } = await supabase
   .from("profiles")
   .select("id", { count: "exact", head: true })
-  .eq("is_admin", true);
+  .eq("is_admin", true)
+  .eq("is_superadmin", false);
 if (adminError) fail(`Checking for an existing Admin: ${adminError.message}`);
 if (adminCount) fail("An Admin already exists. Add further accounts from the app.");
 
@@ -97,7 +98,7 @@ if (createError) fail(`Creating the login: ${createError.message}`);
 
 const { error: profileError } = await supabase
   .from("profiles")
-  .insert({ auth_user_id: created.user.id, name, username, mobile, is_admin: true });
+  .insert({ auth_user_id: created.user.id, name, username, mobile, is_admin: true, is_superadmin: false });
 if (profileError) {
   await supabase.auth.admin.deleteUser(created.user.id);
   fail(`Creating the profile (login removed again): ${profileError.message}`);

@@ -35,6 +35,7 @@ const { data: admin, error: adminError } = await supabase
   .from("profiles")
   .select("id")
   .eq("is_admin", true)
+  .eq("is_superadmin", false)
   .limit(1)
   .maybeSingle();
 if (adminError) fail(`Finding the Admin: ${adminError.message}`);

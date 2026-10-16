@@ -8,6 +8,7 @@ import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDateTime } from 
 import { photoVariant } from "@/lib/photos";
 import { isGroupClosed } from "@/lib/report-rules";
 import { GroupAvatar } from "./GroupAvatar";
+import { GroupHeroPhoto } from "./GroupHeroPhoto";
 import { ChevronRightIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
@@ -229,19 +230,7 @@ export async function GroupProfile({ group, hideAssistants = false }: { group: C
 
   return (
     <Card className="overflow-hidden">
-      {group.photo && (
-        <div className="relative -mx-4 -mt-4 mb-4 aspect-[16/9] bg-slate-100">
-          <Image
-            src={group.photo}
-            alt={`${group.name} fellowship`}
-            fill
-            sizes="(max-width: 576px) 100vw, 576px"
-            className="object-cover"
-            priority
-            unoptimized
-          />
-        </div>
-      )}
+      {group.photo && <GroupHeroPhoto src={group.photo} name={group.name} />}
       <div className="flex items-center gap-4">
         {!group.photo && <GroupAvatar group={group} size="lg" />}
         <div className="min-w-0 flex-1">

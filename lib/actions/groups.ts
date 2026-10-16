@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { recordError, recordSuccess } from "@/lib/activity-log";
 import { getCurrentUser } from "@/lib/auth";
 import { getGroupById } from "@/lib/data-access";
 import { canEditGroup, isGroupClosed } from "@/lib/report-rules";
+import { isAdminRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { photoFiles, removePhotos, uploadPhotos } from "@/lib/uploads";
 import type { FormState } from "./types";
@@ -28,6 +30,12 @@ function parseGroup(formData: FormData) {
   });
 }
 
+function groupFail(action: string, summary: string, error: string | undefined): FormState {
+  const message = error || "Something went wrong.";
+  recordError({ feature: "groups", action, summary, errorMessage: message });
+  return { error: message };
+}
+
 /** Uploads the form's group photo, if any, under a new name so cached copies never go stale. */
 async function uploadGroupPhoto(supabase: Awaited<ReturnType<typeof createClient>>, groupId: string, formData: FormData) {
   const files = photoFiles(formData, "photo", 1);
@@ -38,16 +46,19 @@ async function uploadGroupPhoto(supabase: Awaited<ReturnType<typeof createClient
 }
 
 export async function createGroup(_prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "group_create";
   const user = await getCurrentUser();
-  if (user?.role !== "admin") return { error: "Only the Admin can add groups." };
+  if (!user || !isAdminRole(user.role)) {
+    return groupFail(action, "Group create failed", "Only the Admin can add groups.");
+  }
 
   const parsed = parseGroup(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return groupFail(action, "Group create failed", parsed.error.issues[0].message);
 
   const supabase = await createClient();
   const id = crypto.randomUUID();
   const photo = await uploadGroupPhoto(supabase, id, formData);
-  if ("error" in photo) return photo;
+  if ("error" in photo) return groupFail(action, "Group create failed", photo.error ?? "Could not upload the photo.");
 
   const { error } = await supabase.from("groups").insert({
     id,
@@ -58,61 +69,87 @@ export async function createGroup(_prev: FormState, formData: FormData): Promise
   });
   if (error) {
     if (photo.path) await removePhotos(supabase, "group-photos", [photo.path]);
-    return { error: `Could not add the group: ${error.message}` };
+    return groupFail(action, "Group create failed", `Could not add the group: ${error.message}`);
   }
 
+  recordSuccess({
+    feature: "groups",
+    action,
+    summary: `Added group ${parsed.data.name}`,
+    entityType: "group",
+    entityId: id,
+  });
   revalidatePath("/", "layout");
   redirect(`/groups/${id}?saved=added`);
 }
 
 export async function updateGroup(groupId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "group_update";
   const user = await getCurrentUser();
   const group = await getGroupById(groupId);
   if (!user || !group || !canEditGroup(user, group) || isGroupClosed(group)) {
-    return { error: "Only Admin and this group's leaders can edit it." };
+    return groupFail(action, "Group update failed", "Only Admin and this group's leaders can edit it.");
   }
 
   const parsed = parseGroup(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return groupFail(action, "Group update failed", parsed.error.issues[0].message);
   const { frequency, ...details } = parsed.data;
 
   const supabase = await createClient();
   const { data: current } = await supabase.from("groups").select("photo_path").eq("id", groupId).single();
   const photo = await uploadGroupPhoto(supabase, groupId, formData);
-  if ("error" in photo) return photo;
+  if ("error" in photo) return groupFail(action, "Group update failed", photo.error ?? "Could not upload the photo.");
 
   const { error } = await supabase
     .from("groups")
     .update({
       ...details,
       // Only the Admin decides how often a group meets.
-      ...(user.role === "admin" ? { frequency } : {}),
+      ...(isAdminRole(user.role) ? { frequency } : {}),
       ...(photo.path ? { photo_path: photo.path } : {}),
       updated_by: user.id,
     })
     .eq("id", groupId);
   if (error) {
     if (photo.path) await removePhotos(supabase, "group-photos", [photo.path]);
-    return { error: `Could not save the group: ${error.message}` };
+    return groupFail(action, "Group update failed", `Could not save the group: ${error.message}`);
   }
   if (photo.path && current?.photo_path) await removePhotos(supabase, "group-photos", [current.photo_path]);
 
+  recordSuccess({
+    feature: "groups",
+    action,
+    summary: `Updated group ${parsed.data.name}`,
+    entityType: "group",
+    entityId: groupId,
+  });
   revalidatePath("/", "layout");
-  redirect(user.role === "admin" ? `/groups/${groupId}?saved=updated` : "/group?saved=updated");
+  redirect(isAdminRole(user.role) ? `/groups/${groupId}?saved=updated` : "/group?saved=updated");
 }
 
 export async function closeGroup(groupId: string): Promise<FormState> {
+  const action = "group_close";
   const user = await getCurrentUser();
-  if (user?.role !== "admin") return { error: "Only the Admin can close groups." };
+  if (!user || !isAdminRole(user.role)) {
+    return groupFail(action, "Group close failed", "Only the Admin can close groups.");
+  }
 
+  const group = await getGroupById(groupId);
   const supabase = await createClient();
   const { error } = await supabase
     .from("groups")
     .update({ status: "closed", closed_at: new Date().toISOString(), updated_by: user.id })
     .eq("id", groupId)
     .eq("status", "active");
-  if (error) return { error: `Could not close the group: ${error.message}` };
+  if (error) return groupFail(action, "Group close failed", `Could not close the group: ${error.message}`);
 
+  recordSuccess({
+    feature: "groups",
+    action,
+    summary: `Closed group ${group?.name ?? groupId}`,
+    entityType: "group",
+    entityId: groupId,
+  });
   revalidatePath("/", "layout");
   redirect(`/groups/${groupId}?saved=closed`);
 }

@@ -4,13 +4,17 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { recordError, recordSuccess } from "@/lib/activity-log";
+import { getRealUser, requireUser } from "@/lib/auth";
+import { isUuid } from "@/lib/data-access";
+import { isSuperAdmin } from "@/lib/roles";
 import {
   loginEmailForProfile,
   looksLikeMobile,
   normalizeMobile,
   normalizeUsername,
 } from "@/lib/login-id";
+import { clearLoginAsProfileId, getLoginAsProfileId, setLoginAsProfileId } from "@/lib/login-as";
 import { passwordProblem } from "@/lib/passwords";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearedRememberCookie, rememberCookie } from "@/lib/supabase/remember";
@@ -23,6 +27,18 @@ export interface SignInState {
 }
 
 const WRONG_LOGIN = "Username, mobile number, or password is incorrect.";
+
+function signInFail(error: string, identifier: string): SignInState {
+  recordError({
+    feature: "auth",
+    action: "sign_in",
+    summary: "Sign-in failed",
+    errorMessage: error,
+    actorId: null,
+    actorRole: null,
+  });
+  return { error, identifier };
+}
 
 async function setRememberPreference(remember: boolean) {
   const cookieStore = await cookies();
@@ -59,16 +75,17 @@ async function resolveLoginEmail(typed: string): Promise<{ email: string | null;
 export async function signIn(_prev: SignInState, formData: FormData): Promise<SignInState> {
   const typed = String(formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  if (!typed) return { error: "Enter your username or mobile number.", identifier: typed };
-  if (!password) return { error: "Enter your password.", identifier: typed };
+  if (!typed) return signInFail("Enter your username or mobile number.", typed);
+  if (!password) return signInFail("Enter your password.", typed);
 
   const resolved = await resolveLoginEmail(typed);
-  if (resolved.error) return { error: "Could not sign in. Try again.", identifier: typed };
-  if (!resolved.email) return { error: WRONG_LOGIN, identifier: typed };
+  if (resolved.error) return signInFail("Could not sign in. Try again.", typed);
+  if (!resolved.email) return signInFail(WRONG_LOGIN, typed);
 
   // Set before sign-in so the auth cookies written in this request follow the choice.
   const remember = formData.get("remember") === "on";
   await setRememberPreference(remember);
+  await clearLoginAsProfileId();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -77,7 +94,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   });
   if (error || !data.user) {
     await clearRememberPreference();
-    return { error: WRONG_LOGIN, identifier: typed };
+    return signInFail(WRONG_LOGIN, typed);
   }
 
   // Only active profiles are visible to their owner, so a missing row means no access.
@@ -89,22 +106,123 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   if (!profile) {
     await supabase.auth.signOut();
     await clearRememberPreference();
-    return { error: "This account is not active. Please contact the Admin.", identifier: typed };
+    return signInFail("This account is not active. Please contact the Admin.", typed);
   }
 
+  recordSuccess({
+    feature: "auth",
+    action: "sign_in",
+    summary: "Signed in",
+    actorId: profile.id,
+  });
   redirect("/home");
 }
 
 export async function signOut(): Promise<void> {
+  recordSuccess({ feature: "auth", action: "sign_out", summary: "Signed out" });
   await clearRememberPreference();
+  await clearLoginAsProfileId();
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
 }
 
+/**
+ * Admin-only: view the app as this leader or asst. leader (no password, no OTP).
+ * Keeps the Admin Auth session and sets an httpOnly overlay cookie.
+ */
+export async function loginAsLeader(profileId: string): Promise<{ error?: string }> {
+  const admin = await getRealUser();
+  if (!admin || !isSuperAdmin(admin.role)) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "Only a superadmin can do that.",
+    });
+    return { error: "Only a superadmin can do that." };
+  }
+  if (!isUuid(profileId)) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "Could not find that person.",
+    });
+    return { error: "Could not find that person." };
+  }
+
+  const db = createAdminClient();
+  const { data: profile, error } = await db
+    .from("profiles")
+    .select("id, name, active, is_admin, is_superadmin, auth_user_id, group_leaders(role)")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (error) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "Could not open that login. Try again.",
+    });
+    return { error: "Could not open that login. Try again." };
+  }
+  if (!profile || !profile.active || profile.is_admin || profile.is_superadmin) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "Could not find that person.",
+    });
+    return { error: "Could not find that person." };
+  }
+  if (!profile.auth_user_id) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "Set up a login for this person first.",
+    });
+    return { error: "Set up a login for this person first." };
+  }
+  const memberships = profile.group_leaders ?? [];
+  if (!memberships.length) {
+    recordError({
+      feature: "auth",
+      action: "login_as",
+      summary: "Login as failed",
+      errorMessage: "This person is not a leader or assistant leader.",
+    });
+    return { error: "This person is not a leader or assistant leader." };
+  }
+
+  await setLoginAsProfileId(profile.id);
+  recordSuccess({
+    feature: "auth",
+    action: "login_as",
+    summary: `Logged in as ${profile.name}`,
+    entityType: "profile",
+    entityId: profile.id,
+    actingAsId: profile.id,
+  });
+  revalidatePath("/", "layout");
+  redirect("/home");
+}
+
+/** Ends Admin login-as and restores the Admin view. */
+export async function returnToAdmin(): Promise<void> {
+  const admin = await getRealUser();
+  if (!admin || !isSuperAdmin(admin.role)) redirect("/home");
+  recordSuccess({ feature: "auth", action: "return_to_admin", summary: "Returned to admin" });
+  await clearLoginAsProfileId();
+  revalidatePath("/", "layout");
+  redirect("/people");
+}
+
 /** Saves whether titles such as "Bro." show before names on the signed-in person's own screens. */
 export async function setShowSalutations(show: boolean): Promise<{ error?: string }> {
   await requireUser();
+  if (await getLoginAsProfileId()) return { error: "Back to admin before changing this setting." };
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_show_salutations", { show });
   if (error) return { error: "Could not save. Try again." };
@@ -126,40 +244,52 @@ function createPasswordCheckClient() {
   );
 }
 
+function passwordFail(error: string): ChangePasswordState {
+  recordError({
+    feature: "auth",
+    action: "change_password",
+    summary: "Password change failed",
+    errorMessage: error,
+  });
+  return { error };
+}
+
 /** Replaces the signed-in person's password. Does not change anyone else's login. */
 export async function changePassword(_prev: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
   await requireUser();
+  if (await getLoginAsProfileId()) return passwordFail("Back to admin before changing the password.");
 
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (!currentPassword) return { error: "Enter your current password." };
+  if (!currentPassword) return passwordFail("Enter your current password.");
   const problem = passwordProblem(newPassword);
-  if (problem) return { error: problem };
-  if (newPassword !== confirmPassword) return { error: "New passwords don't match." };
+  if (problem) return passwordFail(problem);
+  if (newPassword !== confirmPassword) return passwordFail("New passwords don't match.");
 
   const supabase = await createClient();
   const { data: auth, error: authError } = await supabase.auth.getClaims();
   const authUserId = auth?.claims.sub;
-  if (authError || !authUserId) return { error: "Sign in again to change your password." };
+  if (authError || !authUserId) return passwordFail("Sign in again to change your password.");
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("username, mobile")
     .eq("auth_user_id", authUserId)
     .maybeSingle();
-  if (profileError || !profile) return { error: "Could not change the password. Try again." };
+  if (profileError || !profile) return passwordFail("Could not change the password. Try again.");
 
   const email = loginEmailForProfile(profile);
-  if (!email) return { error: "This account has no login. Ask the Admin to set one up." };
+  if (!email) return passwordFail("This account has no login. Ask the Admin to set one up.");
 
   const probe = createPasswordCheckClient();
   const { error: signInError } = await probe.auth.signInWithPassword({ email, password: currentPassword });
-  if (signInError) return { error: "Current password is incorrect." };
+  if (signInError) return passwordFail("Current password is incorrect.");
 
   const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-  if (updateError) return { error: "Could not change the password. Try again." };
+  if (updateError) return passwordFail("Could not change the password. Try again.");
 
+  recordSuccess({ feature: "auth", action: "change_password", summary: "Changed password" });
   return { saved: true };
 }

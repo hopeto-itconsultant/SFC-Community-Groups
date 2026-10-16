@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          acting_as_id: string | null
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          feature: string
+          id: string
+          outcome: string
+          summary: string
+        }
+        Insert: {
+          acting_as_id?: string | null
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature: string
+          id?: string
+          outcome: string
+          summary: string
+        }
+        Update: {
+          acting_as_id?: string | null
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature?: string
+          id?: string
+          outcome?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_acting_as_id_fkey"
+            columns: ["acting_as_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_leaders: {
         Row: {
           created_at: string
@@ -116,6 +176,7 @@ export type Database = {
           email: string | null
           id: string
           is_admin: boolean
+          is_superadmin: boolean
           mobile: string | null
           name: string
           serving_since: string | null
@@ -131,6 +192,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean
+          is_superadmin?: boolean
           mobile?: string | null
           name: string
           serving_since?: string | null
@@ -146,6 +208,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean
+          is_superadmin?: boolean
           mobile?: string | null
           name?: string
           serving_since?: string | null
@@ -265,6 +328,7 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      is_superadmin: { Args: never; Returns: boolean }
       is_group_member: { Args: { group_id: string }; Returns: boolean }
       report_is_latest: { Args: { p_report_id: string }; Returns: boolean }
       report_type_summaries: { Args: { p_group_id?: string }; Returns: Json }
