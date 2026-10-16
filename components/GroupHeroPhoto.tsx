@@ -13,7 +13,7 @@ export function GroupHeroPhoto({ src, name }: { src: string; name: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="relative -mx-4 -mt-4 mb-4 block aspect-[16/9] w-[calc(100%+2rem)] bg-slate-100"
+        className="relative -mx-4 -mt-4 mb-4 block aspect-[16/9] w-[calc(100%+2rem)] max-w-none bg-slate-100 text-left"
         aria-label={`View ${name} photo`}
       >
         <Image
