@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          acting_as_id: string | null
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          feature: string
+          id: string
+          outcome: string
+          summary: string
+        }
+        Insert: {
+          acting_as_id?: string | null
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature: string
+          id?: string
+          outcome: string
+          summary: string
+        }
+        Update: {
+          acting_as_id?: string | null
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature?: string
+          id?: string
+          outcome?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_acting_as_id_fkey"
+            columns: ["acting_as_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_leaders: {
         Row: {
           created_at: string

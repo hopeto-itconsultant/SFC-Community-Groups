@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { CommunityGroup, FellowshipReport, User } from "@/data/types";
+import { recordError, recordSuccess } from "@/lib/activity-log";
 import { getCurrentUser } from "@/lib/auth";
 import { getGroupById, getReportById, hasFellowshipOnDate, isLatestFiledReport } from "@/lib/data-access";
 import { combineDateAndTime, startOfDayTimestamp, todayISO } from "@/lib/format";
@@ -12,6 +13,12 @@ import { canEditFiledReport, canEditPlan, isGroupClosed } from "@/lib/report-rul
 import { createClient } from "@/lib/supabase/server";
 import { photoFiles, removePhotos, uploadPhotos } from "@/lib/uploads";
 import type { FormState } from "./types";
+
+function reportFail(action: string, summary: string, error: string | undefined): FormState {
+  const message = error || "Something went wrong.";
+  recordError({ feature: "reports", action, summary, errorMessage: message });
+  return { error: message };
+}
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date.");
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/, "Choose a time.");
@@ -75,22 +82,23 @@ const fellowshipSchema = z
   .refine((v) => v.date <= todayISO(), "The fellowship date can't be in the future.");
 
 export async function createFellowshipReport(_prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "fellowship_create";
   const ctx = await reportingContext();
-  if ("error" in ctx) return ctx;
+  if ("error" in ctx) return reportFail(action, "Fellowship create failed", ctx.error ?? "Could not file the report.");
 
   const parsed = fellowshipSchema.safeParse(fields(formData, [...FELLOWSHIP_FIELDS]));
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Fellowship create failed", firstError(parsed.error));
   if (await hasFellowshipOnDate(ctx.group.id, parsed.data.date)) {
-    return { error: "A fellowship report has already been filed for that date." };
+    return reportFail(action, "Fellowship create failed", "A fellowship report has already been filed for that date.");
   }
   const files = photoFiles(formData, "photos", MAX_PHOTOS);
-  if (typeof files === "string") return { error: files };
+  if (typeof files === "string") return reportFail(action, "Fellowship create failed", files);
 
   const v = parsed.data;
   const supabase = await createClient();
   const id = crypto.randomUUID();
   const photoPaths = await uploadPhotos(supabase, "report-photos", ctx.group.id, id, files);
-  if ("error" in photoPaths) return photoPaths;
+  if ("error" in photoPaths) return reportFail(action, "Fellowship create failed", photoPaths.error);
 
   const { error } = await supabase.from("reports").insert({
     id,
@@ -109,9 +117,16 @@ export async function createFellowshipReport(_prev: FormState, formData: FormDat
   });
   if (error) {
     await removePhotos(supabase, "report-photos", photoPaths);
-    return { error: `Could not save the report: ${error.message}` };
+    return reportFail(action, "Fellowship create failed", `Could not save the report: ${error.message}`);
   }
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: `Filed fellowship for ${ctx.group.name}`,
+    entityType: "report",
+    entityId: id,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${id}?saved=new`);
 }
@@ -155,26 +170,29 @@ export async function updateFellowshipReport(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  const action = "fellowship_update";
   const ctx = await editableFiledReport(reportId);
-  if ("error" in ctx) return ctx;
-  if (ctx.report.type !== "fellowship") return { error: "This report could not be found." };
+  if ("error" in ctx) return reportFail(action, "Fellowship update failed", ctx.error);
+  if (ctx.report.type !== "fellowship") {
+    return reportFail(action, "Fellowship update failed", "This report could not be found.");
+  }
 
   const parsed = fellowshipSchema.safeParse(fields(formData, [...FELLOWSHIP_FIELDS]));
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Fellowship update failed", firstError(parsed.error));
   if (await hasFellowshipOnDate(ctx.group.id, parsed.data.date, reportId)) {
-    return { error: "A fellowship report has already been filed for that date." };
+    return reportFail(action, "Fellowship update failed", "A fellowship report has already been filed for that date.");
   }
 
   const currentPaths = fellowshipPhotoPaths(ctx.report);
-  if ("error" in currentPaths) return currentPaths;
+  if ("error" in currentPaths) return reportFail(action, "Fellowship update failed", currentPaths.error);
   const kept = keptPhotoPaths(formData, currentPaths);
-  if (typeof kept === "string") return { error: kept };
+  if (typeof kept === "string") return reportFail(action, "Fellowship update failed", kept);
   const files = photoFiles(formData, "photos", MAX_PHOTOS - kept.length);
-  if (typeof files === "string") return { error: files };
+  if (typeof files === "string") return reportFail(action, "Fellowship update failed", files);
 
   const supabase = await createClient();
   const uploaded = await uploadPhotos(supabase, "report-photos", ctx.group.id, crypto.randomUUID(), files);
-  if ("error" in uploaded) return uploaded;
+  if ("error" in uploaded) return reportFail(action, "Fellowship update failed", uploaded.error);
 
   const v = parsed.data;
   const { error } = await supabase
@@ -194,7 +212,7 @@ export async function updateFellowshipReport(
     .eq("id", reportId);
   if (error) {
     await removePhotos(supabase, "report-photos", uploaded);
-    return { error: saveError(error, "Could not save the report:") };
+    return reportFail(action, "Fellowship update failed", saveError(error, "Could not save the report:"));
   }
 
   await removePhotos(
@@ -202,6 +220,13 @@ export async function updateFellowshipReport(
     "report-photos",
     currentPaths.filter((path) => !kept.includes(path)),
   );
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: `Updated fellowship for ${ctx.group.name}`,
+    entityType: "report",
+    entityId: reportId,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${reportId}?saved=updated`);
 }
@@ -214,11 +239,12 @@ const followUpSchema = z.object({
 });
 
 export async function createFollowUpReport(_prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "follow_up_create";
   const ctx = await reportingContext();
-  if ("error" in ctx) return ctx;
+  if ("error" in ctx) return reportFail(action, "Follow-up create failed", ctx.error);
 
   const parsed = followUpSchema.safeParse(fields(formData, ["date", "personName", "mode", "comments"]));
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Follow-up create failed", firstError(parsed.error));
 
   const v = parsed.data;
   const supabase = await createClient();
@@ -233,8 +259,15 @@ export async function createFollowUpReport(_prev: FormState, formData: FormData)
     contact_mode: v.mode,
     comments: v.comments,
   });
-  if (error) return { error: `Could not save the follow-up: ${error.message}` };
+  if (error) return reportFail(action, "Follow-up create failed", `Could not save the follow-up: ${error.message}`);
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: `Filed follow-up for ${ctx.group.name}`,
+    entityType: "report",
+    entityId: id,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${id}?saved=new`);
 }
@@ -244,12 +277,15 @@ export async function updateFollowUpReport(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  const action = "follow_up_update";
   const ctx = await editableFiledReport(reportId);
-  if ("error" in ctx) return ctx;
-  if (ctx.report.type !== "follow-up") return { error: "This report could not be found." };
+  if ("error" in ctx) return reportFail(action, "Follow-up update failed", ctx.error);
+  if (ctx.report.type !== "follow-up") {
+    return reportFail(action, "Follow-up update failed", "This report could not be found.");
+  }
 
   const parsed = followUpSchema.safeParse(fields(formData, ["date", "personName", "mode", "comments"]));
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Follow-up update failed", firstError(parsed.error));
 
   const v = parsed.data;
   const supabase = await createClient();
@@ -263,8 +299,17 @@ export async function updateFollowUpReport(
       updated_by: ctx.user.id,
     })
     .eq("id", reportId);
-  if (error) return { error: saveError(error, "Could not save the follow-up:") };
+  if (error) {
+    return reportFail(action, "Follow-up update failed", saveError(error, "Could not save the follow-up:"));
+  }
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: `Updated follow-up for ${ctx.group.name}`,
+    entityType: "report",
+    entityId: reportId,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${reportId}?saved=updated`);
 }
@@ -282,11 +327,12 @@ function parsePlan(formData: FormData) {
 }
 
 export async function createPlan(_prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "plan_create";
   const ctx = await reportingContext();
-  if ("error" in ctx) return ctx;
+  if ("error" in ctx) return reportFail(action, "Plan create failed", ctx.error);
 
   const parsed = parsePlan(formData);
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Plan create failed", firstError(parsed.error));
 
   const v = parsed.data;
   const supabase = await createClient();
@@ -301,8 +347,15 @@ export async function createPlan(_prev: FormState, formData: FormData): Promise<
     activity: v.activity,
     goals: v.goals,
   });
-  if (error) return { error: `Could not save the plan: ${error.message}` };
+  if (error) return reportFail(action, "Plan create failed", `Could not save the plan: ${error.message}`);
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: `Saved next fellowship plan for ${ctx.group.name}`,
+    entityType: "report",
+    entityId: id,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${id}?saved=new`);
 }
@@ -319,11 +372,12 @@ async function editablePlan(planId: string) {
 }
 
 export async function updatePlan(planId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const action = "plan_update";
   const ctx = await editablePlan(planId);
-  if ("error" in ctx) return ctx;
+  if ("error" in ctx) return reportFail(action, "Plan update failed", ctx.error);
 
   const parsed = parsePlan(formData);
-  if (!parsed.success) return { error: firstError(parsed.error) };
+  if (!parsed.success) return reportFail(action, "Plan update failed", firstError(parsed.error));
 
   const v = parsed.data;
   const supabase = await createClient();
@@ -337,23 +391,38 @@ export async function updatePlan(planId: string, _prev: FormState, formData: For
       updated_by: ctx.user.id,
     })
     .eq("id", planId);
-  if (error) return { error: `Could not save the plan: ${error.message}` };
+  if (error) return reportFail(action, "Plan update failed", `Could not save the plan: ${error.message}`);
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: "Updated next fellowship plan",
+    entityType: "report",
+    entityId: planId,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${planId}?saved=updated`);
 }
 
 export async function cancelPlan(planId: string): Promise<FormState> {
+  const action = "plan_cancel";
   const ctx = await editablePlan(planId);
-  if ("error" in ctx) return ctx;
+  if ("error" in ctx) return reportFail(action, "Plan cancel failed", ctx.error);
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("reports")
     .update({ cancelled_at: new Date().toISOString(), updated_by: ctx.user.id })
     .eq("id", planId);
-  if (error) return { error: `Could not cancel the plan: ${error.message}` };
+  if (error) return reportFail(action, "Plan cancel failed", `Could not cancel the plan: ${error.message}`);
 
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: "Cancelled next fellowship plan",
+    entityType: "report",
+    entityId: planId,
+  });
   revalidatePath("/", "layout");
   redirect(`/reports/${planId}?saved=cancelled`);
 }

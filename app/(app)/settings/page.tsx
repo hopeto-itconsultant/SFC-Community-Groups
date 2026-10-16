@@ -5,6 +5,7 @@ import { Badge, Button, Card, InfoRow, SectionTitle } from "@/components/ui";
 import { signOut } from "@/lib/actions/auth";
 import { requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
+import { SUPERADMIN } from "@/lib/config";
 import { getGroupById } from "@/lib/data-access";
 import { ROLE_LABELS, displayName } from "@/lib/format";
 import { InstallAppLink } from "./InstallAppLink";
@@ -40,6 +41,18 @@ export default async function SettingsPage() {
               </span>
               <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
             </Link>
+            {SUPERADMIN && (
+              <Link
+                href="/activity"
+                className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold">Activity log</span>
+                  <span className="block text-sm text-slate-500">Feature use and errors across the app</span>
+                </span>
+                <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
+              </Link>
+            )}
           </div>
         )}
 

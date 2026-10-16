@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { recordError, recordSuccess, type ActivityFeature } from "@/lib/activity-log";
 import { getCurrentUser } from "@/lib/auth";
 import { readMobileFields } from "@/lib/countries";
 import { isUuid } from "@/lib/data-access";
@@ -17,6 +18,15 @@ import { DEFAULT_PASSWORD, passwordProblem } from "@/lib/passwords";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "./types";
+
+function trackFail(
+  feature: ActivityFeature,
+  action: string,
+  summary: string,
+  error: string,
+): void {
+  recordError({ feature, action, summary, errorMessage: error });
+}
 
 export interface LoginState extends FormState {
   /** Shown once to the Admin so they can pass the details on. */
@@ -185,7 +195,10 @@ export async function addMember(
 ): Promise<AddMemberState> {
   const phone = readMobileFields(formData);
   const values = memberFormValues(formData);
-  const fail = (error: string): AddMemberState => ({ error, values });
+  const fail = (error: string): AddMemberState => {
+    trackFail("people", "member_add", "Add leader failed", error);
+    return { error, values };
+  };
   if (!(await isAdmin())) return fail("Only the Admin can add leaders.");
 
   const parsed = memberSchema.safeParse(values);
@@ -234,6 +247,13 @@ export async function addMember(
     return fail(error.code === "23505" ? "This person is already in the group." : `Could not add: ${error.message}`);
   }
 
+  recordSuccess({
+    feature: "people",
+    action: "member_add",
+    summary: `Added ${parsed.data.name} to a group`,
+    entityType: "profile",
+    entityId: profileId,
+  });
   revalidatePath("/", "layout");
   return {};
 }
@@ -242,7 +262,10 @@ export async function addMember(
 export async function addRosterMember(_prev: AddMemberState, formData: FormData): Promise<AddMemberState> {
   const values = memberFormValues(formData);
   const groupId = String(formData.get("groupId") ?? "");
-  if (!isUuid(groupId)) return { error: "Choose a group.", values };
+  if (!isUuid(groupId)) {
+    trackFail("people", "member_add", "Add leader failed", "Choose a group.");
+    return { error: "Choose a group.", values };
+  }
   const result = await addMember(groupId, _prev, formData);
   return result.error ? result : { added: true };
 }
@@ -262,7 +285,10 @@ export async function updateMemberDetails(
     ...detailValues(formData),
     ...(rawName === null ? {} : { name: String(rawName) }),
   };
-  const fail = (error: string): MemberDetailsState => ({ error, values });
+  const fail = (error: string): MemberDetailsState => {
+    trackFail("people", "member_details_update", "Leader details update failed", error);
+    return { error, values };
+  };
   if (!isUuid(profileId)) return fail("Could not find that person.");
   const blocked = await memberDetailsBlock(profileId);
   if (blocked) return fail(blocked);
@@ -293,12 +319,22 @@ export async function updateMemberDetails(
   if (error) return fail(`Could not save the details: ${error.message}`);
   if (!data) return fail("Could not find that person.");
 
+  recordSuccess({
+    feature: "people",
+    action: "member_details_update",
+    summary: "Updated leader details",
+    entityType: "profile",
+    entityId: profileId,
+  });
   revalidatePath("/", "layout");
   return { saved: true };
 }
 
 export async function removeMember(groupId: string, profileId: string): Promise<FormState> {
-  if (!(await isAdmin())) return { error: "Only the Admin can remove leaders." };
+  if (!(await isAdmin())) {
+    trackFail("people", "member_remove", "Remove leader failed", "Only the Admin can remove leaders.");
+    return { error: "Only the Admin can remove leaders." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -306,8 +342,18 @@ export async function removeMember(groupId: string, profileId: string): Promise<
     .delete()
     .eq("group_id", groupId)
     .eq("profile_id", profileId);
-  if (error) return { error: `Could not remove: ${error.message}` };
+  if (error) {
+    trackFail("people", "member_remove", "Remove leader failed", `Could not remove: ${error.message}`);
+    return { error: `Could not remove: ${error.message}` };
+  }
 
+  recordSuccess({
+    feature: "people",
+    action: "member_remove",
+    summary: "Removed leader from group",
+    entityType: "profile",
+    entityId: profileId,
+  });
   revalidatePath("/", "layout");
   return {};
 }
@@ -351,7 +397,10 @@ async function writeLogin(
 export async function setLogin(profileId: string, _prev: LoginState, formData: FormData): Promise<LoginState> {
   const phone = readMobileFields(formData);
   const values = { country: phone.country, mobile: phone.national };
-  const fail = (error: string): LoginState => ({ error, values });
+  const fail = (error: string): LoginState => {
+    trackFail("people", "login_set", "Set login failed", error);
+    return { error, values };
+  };
   if (!(await isAdmin())) return fail("Only the Admin can set up logins.");
 
   const password = String(formData.get("password") ?? "");
@@ -390,6 +439,13 @@ export async function setLogin(profileId: string, _prev: LoginState, formData: F
       mobile = nextMobile;
     }
 
+    recordSuccess({
+      feature: "admins",
+      action: "login_set",
+      summary: `Updated login for ${profile.name}`,
+      entityType: "profile",
+      entityId: profileId,
+    });
     revalidatePath("/", "layout");
     return {
       saved: { name: profile.name, username: profile.username, mobile: mobile ?? undefined, password },
@@ -410,6 +466,13 @@ export async function setLogin(profileId: string, _prev: LoginState, formData: F
   const message = await writeLogin(admin, profile, mobile, password);
   if (message) return fail(message);
 
+  recordSuccess({
+    feature: "people",
+    action: "login_set",
+    summary: `Set login for ${profile.name}`,
+    entityType: "profile",
+    entityId: profileId,
+  });
   revalidatePath("/", "layout");
   return { saved: { name: profile.name, mobile, password } };
 }
@@ -423,7 +486,10 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
     country: phone.country,
     mobile: phone.national,
   };
-  const fail = (error: string): CreateAdminState => ({ error, values });
+  const fail = (error: string): CreateAdminState => {
+    trackFail("admins", "admin_create", "Create admin failed", error);
+    return { error, values };
+  };
   if (!(await isAdmin())) return fail("Only an Admin can add admins.");
 
   const username = normalizeUsername(values.username);
@@ -464,25 +530,44 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
     return fail(`Could not add the admin: ${profileError.message}`);
   }
 
+  recordSuccess({
+    feature: "admins",
+    action: "admin_create",
+    summary: `Created admin ${name}`,
+    entityType: "profile",
+  });
   revalidatePath("/", "layout");
   return { saved: { name, username, mobile: mobile ?? undefined, password } };
 }
 
 /** Turns an Admin's login off or back on. You can't deactivate yourself or the last active Admin. */
 export async function setAdminActive(profileId: string, active: boolean): Promise<FormState> {
-  if (!(await isAdmin())) return { error: "Only an Admin can change admins." };
-  if (!isUuid(profileId)) return { error: "Could not find that admin." };
+  const action = "admin_set_active";
+  if (!(await isAdmin())) {
+    trackFail("admins", action, "Admin active change failed", "Only an Admin can change admins.");
+    return { error: "Only an Admin can change admins." };
+  }
+  if (!isUuid(profileId)) {
+    trackFail("admins", action, "Admin active change failed", "Could not find that admin.");
+    return { error: "Could not find that admin." };
+  }
 
   const user = await getCurrentUser();
-  if (!active && user?.id === profileId) return { error: "You can't deactivate your own login." };
+  if (!active && user?.id === profileId) {
+    trackFail("admins", action, "Admin active change failed", "You can't deactivate your own login.");
+    return { error: "You can't deactivate your own login." };
+  }
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("id, is_admin, active")
+    .select("id, name, is_admin, active")
     .eq("id", profileId)
     .maybeSingle();
-  if (profileError || !profile?.is_admin) return { error: "Could not find that admin." };
+  if (profileError || !profile?.is_admin) {
+    trackFail("admins", action, "Admin active change failed", "Could not find that admin.");
+    return { error: "Could not find that admin." };
+  }
 
   if (!active && profile.active) {
     const { count, error: countError } = await admin
@@ -490,13 +575,29 @@ export async function setAdminActive(profileId: string, active: boolean): Promis
       .select("id", { count: "exact", head: true })
       .eq("is_admin", true)
       .eq("active", true);
-    if (countError) return { error: `Could not check admins: ${countError.message}` };
-    if ((count ?? 0) <= 1) return { error: "Keep at least one active Admin." };
+    if (countError) {
+      trackFail("admins", action, "Admin active change failed", `Could not check admins: ${countError.message}`);
+      return { error: `Could not check admins: ${countError.message}` };
+    }
+    if ((count ?? 0) <= 1) {
+      trackFail("admins", action, "Admin active change failed", "Keep at least one active Admin.");
+      return { error: "Keep at least one active Admin." };
+    }
   }
 
   const { error } = await admin.from("profiles").update({ active }).eq("id", profileId).eq("is_admin", true);
-  if (error) return { error: `Could not update the admin: ${error.message}` };
+  if (error) {
+    trackFail("admins", action, "Admin active change failed", `Could not update the admin: ${error.message}`);
+    return { error: `Could not update the admin: ${error.message}` };
+  }
 
+  recordSuccess({
+    feature: "admins",
+    action,
+    summary: active ? `Reactivated admin ${profile.name}` : `Deactivated admin ${profile.name}`,
+    entityType: "profile",
+    entityId: profileId,
+  });
   revalidatePath("/", "layout");
   return {};
 }
@@ -537,13 +638,17 @@ export async function saveLeaderRecord(input: {
   name: string;
   mobile?: string;
 }): Promise<LeaderRecordState> {
-  if (!(await isAdmin())) return { error: "Only the Admin can edit leaders." };
-  if (!isUuid(input.profileId)) return { error: "Could not find that person." };
+  const fail = (error: string): LeaderRecordState => {
+    trackFail("people", "leader_record_save", "Leader record save failed", error);
+    return { error };
+  };
+  if (!(await isAdmin())) return fail("Only the Admin can edit leaders.");
+  if (!isUuid(input.profileId)) return fail("Could not find that person.");
   const parsed = personNameSchema.safeParse(input.name);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const mobile = input.mobile?.trim() ?? "";
-  if (mobile && !MOBILE_PATTERN.test(mobile)) return { error: "Enter a valid mobile number, e.g. 9876543210." };
+  if (mobile && !MOBILE_PATTERN.test(mobile)) return fail("Enter a valid mobile number, e.g. 9876543210.");
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
@@ -551,23 +656,30 @@ export async function saveLeaderRecord(input: {
     .select("id, name, mobile, auth_user_id, active, is_admin")
     .eq("id", input.profileId)
     .maybeSingle();
-  if (profileError || !profile || profile.is_admin || !profile.active) return { error: "Could not find that person." };
+  if (profileError || !profile || profile.is_admin || !profile.active) return fail("Could not find that person.");
 
   const name = parsed.data;
   const phoneChanged = Boolean(mobile) && mobile !== profile.mobile;
   if (phoneChanged) {
     const taken = await mobileTakenBy(admin, mobile, profile.id);
-    if (taken) return { error: taken };
+    if (taken) return fail(taken);
   }
 
   if (mobile && !profile.auth_user_id) {
     if (name !== profile.name) {
       const { error } = await admin.from("profiles").update({ name }).eq("id", profile.id);
-      if (error) return { error: `Could not save: ${error.message}` };
+      if (error) return fail(`Could not save: ${error.message}`);
     }
     const password = DEFAULT_PASSWORD;
     const message = await writeLogin(admin, profile, mobile, password);
-    if (message) return { error: message };
+    if (message) return fail(message);
+    recordSuccess({
+      feature: "people",
+      action: "login_set",
+      summary: `Created login for ${name}`,
+      entityType: "profile",
+      entityId: profile.id,
+    });
     revalidatePath("/", "layout");
     return { login: { name, mobile, password } };
   }
@@ -577,16 +689,23 @@ export async function saveLeaderRecord(input: {
       email: loginEmailForMobile(mobile),
       email_confirm: true,
     });
-    if (error) return { error: `Could not update the sign-in number: ${error.message}` };
+    if (error) return fail(`Could not update the sign-in number: ${error.message}`);
   }
 
   if (phoneChanged || name !== profile.name) {
     const patch: { name: string; mobile?: string } = { name };
     if (phoneChanged) patch.mobile = mobile;
     const { error } = await admin.from("profiles").update(patch).eq("id", profile.id);
-    if (error) return { error: `Could not save: ${error.message}` };
+    if (error) return fail(`Could not save: ${error.message}`);
   }
 
+  recordSuccess({
+    feature: "people",
+    action: "leader_record_save",
+    summary: `Updated ${name}`,
+    entityType: "profile",
+    entityId: profile.id,
+  });
   revalidatePath("/", "layout");
   if (mobile && profile.auth_user_id) return { passwordUnchanged: true };
   return {};
@@ -594,8 +713,12 @@ export async function saveLeaderRecord(input: {
 
 /** Replaces the password on an existing leader login. Does not run as part of save. */
 export async function resetLeaderPassword(profileId: string): Promise<{ error?: string; login?: IssuedLogin }> {
-  if (!(await isAdmin())) return { error: "Only the Admin can edit leaders." };
-  if (!isUuid(profileId)) return { error: "Could not find that person." };
+  const fail = (error: string) => {
+    trackFail("people", "password_reset", "Password reset failed", error);
+    return { error };
+  };
+  if (!(await isAdmin())) return fail("Only the Admin can edit leaders.");
+  if (!isUuid(profileId)) return fail("Could not find that person.");
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
@@ -603,13 +726,20 @@ export async function resetLeaderPassword(profileId: string): Promise<{ error?: 
     .select("id, name, mobile, auth_user_id, active, is_admin")
     .eq("id", profileId)
     .maybeSingle();
-  if (profileError || !profile || profile.is_admin || !profile.active) return { error: "Could not find that person." };
-  if (!profile.auth_user_id || !profile.mobile) return { error: "This person does not have a login yet." };
+  if (profileError || !profile || profile.is_admin || !profile.active) return fail("Could not find that person.");
+  if (!profile.auth_user_id || !profile.mobile) return fail("This person does not have a login yet.");
 
   const password = DEFAULT_PASSWORD;
   const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, { password });
-  if (error) return { error: `Could not reset the password: ${error.message}` };
+  if (error) return fail(`Could not reset the password: ${error.message}`);
 
+  recordSuccess({
+    feature: "people",
+    action: "password_reset",
+    summary: `Reset password for ${profile.name}`,
+    entityType: "profile",
+    entityId: profile.id,
+  });
   revalidatePath("/", "layout");
   return { login: { name: profile.name, mobile: profile.mobile, password } };
 }
