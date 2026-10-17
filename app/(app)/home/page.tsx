@@ -18,7 +18,7 @@ import {
   getUpcomingFellowships,
 } from "@/lib/data-access";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
-import { ROLE_LABELS, displayName, formatRupees, formatShortDateTime } from "@/lib/format";
+import { ROLE_LABELS, displayName, formatRupees, formatShortDateTimeDay } from "@/lib/format";
 import { isAdminRole } from "@/lib/roles";
 
 export default async function HomePage() {
@@ -165,8 +165,8 @@ function StatusRow({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 break-words text-[15px] font-semibold">{label}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-[15px] font-semibold">{label}</p>
           {badge && <span className="shrink-0 whitespace-nowrap">{badge}</span>}
         </div>
         <p className="break-words text-xs text-slate-500">{detail}</p>
@@ -185,7 +185,7 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
         <StatusRow
           href={`/reports/${next.id}`}
           icon={<CalendarIcon width={18} height={18} />}
-          label={`Next · ${formatShortDateTime(next.proposedDate, next.time)}`}
+          label={`Next · ${formatShortDateTimeDay(next.proposedDate, next.time)}`}
           detail={next.location}
           badge={<Badge tone="green">Upcoming</Badge>}
         />
@@ -202,7 +202,7 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
         <StatusRow
           href={`/reports/${last.id}`}
           icon={<FileTextIcon width={18} height={18} />}
-          label={`Last · ${formatShortDateTime(last.date, last.time)}`}
+          label={`Last · ${formatShortDateTimeDay(last.date, last.time)}`}
           detail={`${last.attendees} attended · ${last.firstTimers} first-time`}
         />
       ) : (

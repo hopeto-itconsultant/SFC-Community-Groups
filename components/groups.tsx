@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { CommunityGroup, User } from "@/data/types";
 import { getNameDisplay } from "@/lib/auth";
 import { getGroupAssistantLeaders, getGroupLeaders, getNextFellowship } from "@/lib/data-access";
-import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDateTime } from "@/lib/format";
+import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate, formatShortDateTimeDay } from "@/lib/format";
 import { photoVariant } from "@/lib/photos";
 import { isGroupClosed } from "@/lib/report-rules";
 import { GroupAvatar } from "./GroupAvatar";
@@ -62,7 +62,7 @@ export function ClosedBadge() {
   return <Badge tone="slate">Closed</Badge>;
 }
 
-async function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
+async function NextFellowshipBadge({ group, compact = false }: { group: CommunityGroup; compact?: boolean }) {
   if (isGroupClosed(group)) {
     return (
       <span className="shrink-0 self-start whitespace-nowrap">
@@ -72,9 +72,13 @@ async function NextFellowshipBadge({ group }: { group: CommunityGroup }) {
   }
   const next = await getNextFellowship(group.id);
   if (!next) return null;
+  const when = formatShortDateTimeDay(next.proposedDate, next.time);
+  if (compact) {
+    return <p className="whitespace-nowrap text-xs font-semibold text-emerald-700">{when}</p>;
+  }
   return (
     <span className="shrink-0 self-start whitespace-nowrap">
-      <Badge tone="green">Next {formatShortDateTime(next.proposedDate, next.time)}</Badge>
+      <Badge tone="green">Next {when}</Badge>
     </span>
   );
 }
@@ -97,7 +101,7 @@ export async function GroupMiniCard({ group }: { group: CommunityGroup }) {
           {namesOrNotAssigned(leaders, shown)}
         </p>
       </div>
-      <NextFellowshipBadge group={group} />
+      <NextFellowshipBadge group={group} compact />
     </Link>
   );
 }
@@ -172,13 +176,11 @@ export async function GroupSummaryRow({ group }: { group: CommunityGroup }) {
     >
       <GroupAvatar group={group} size="sm" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[15px] font-semibold">{group.name}</p>
-          <NextFellowshipBadge group={group} />
-        </div>
+        <p className="truncate text-[15px] font-semibold">{group.name}</p>
         <p className={`break-words text-xs ${leaders.length ? "text-slate-500" : "text-slate-400"}`}>
           {namesOrNotAssigned(leaders, shown)}
         </p>
+        <NextFellowshipBadge group={group} />
       </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
     </Link>

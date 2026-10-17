@@ -1,6 +1,7 @@
 import type { ContactMode, Frequency, ReportType, Role } from "@/data/types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Parses "YYYY-MM-DD" (or an ISO date-time) as a local calendar date. */
 export function parseLocalDate(iso: string): Date {
@@ -36,6 +37,12 @@ export function formatDateTime(iso: string, time?: string): string {
 /** Short date, with the time appended when one was recorded. */
 export function formatShortDateTime(iso: string, time?: string): string {
   return time ? `${formatShortDate(iso)}, ${formatTime(time)}` : formatShortDate(iso);
+}
+
+/** Short date, time when recorded, then the weekday: "31 Oct, 5:00 PM, Sat". */
+export function formatShortDateTimeDay(iso: string, time?: string): string {
+  const day = WEEKDAYS[parseLocalDate(iso).getDay()];
+  return `${formatShortDateTime(iso, time)}, ${day}`;
 }
 
 /** "HH:MM:SS" from the database as the "HH:MM" a time input expects. */
