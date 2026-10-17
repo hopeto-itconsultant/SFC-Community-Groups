@@ -165,11 +165,11 @@ function StatusRow({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[15px] font-semibold">{label}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 break-words text-[15px] font-semibold">{label}</p>
           {badge && <span className="shrink-0 whitespace-nowrap">{badge}</span>}
         </div>
-        <p className="truncate text-xs text-slate-500">{detail}</p>
+        <p className="break-words text-xs text-slate-500">{detail}</p>
       </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
     </Link>
