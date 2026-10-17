@@ -25,7 +25,7 @@ import {
   todayISO,
 } from "@/lib/format";
 import { photoVariant } from "@/lib/photos";
-import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
+import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, MapPinIcon } from "./icons";
 import { PhotoGrid } from "./PhotoGrid";
 import { Badge, Card, InfoRow } from "./ui";
 
@@ -85,6 +85,38 @@ export function UpcomingBadge({ report }: { report: NextFellowship }) {
   );
 }
 
+function ReportIdentity({
+  report,
+  groupName,
+  large = false,
+}: {
+  report: Report;
+  groupName?: string;
+  large?: boolean;
+}) {
+  if (report.type === "next-fellowship") {
+    return (
+      <div className="flex min-w-0 items-center gap-2">
+        <DateCalendarIcon date={report.proposedDate} />
+        <p className={`min-w-0 truncate text-brand-700 ${large ? "text-lg font-bold" : "font-bold"}`}>
+          <span className="sr-only">Next Fellowship, </span>
+          {groupName}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0">
+      <p className={large ? "text-lg font-bold" : "font-bold"}>
+        <span aria-hidden="true">{REPORT_TYPE_EMOJI[report.type]} </span>
+        {REPORT_TYPE_LABELS[report.type]}
+      </p>
+      <p className={`truncate text-brand-700 ${large ? "font-medium" : "text-sm font-medium"}`}>{groupName}</p>
+    </div>
+  );
+}
+
 export async function ReportCard({ report }: { report: Report }) {
   const [group, filedBy, shown] = await groupAndFiler(report);
   return (
@@ -93,13 +125,9 @@ export async function ReportCard({ report }: { report: Report }) {
       prefetch={false}
       className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-bold">
-            <span aria-hidden="true">{REPORT_TYPE_EMOJI[report.type]} </span>
-            {REPORT_TYPE_LABELS[report.type]}
-          </p>
-          <p className="truncate text-sm font-medium text-brand-700">{group?.name}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <ReportIdentity report={report} groupName={group?.name} />
         </div>
         {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
       </div>
@@ -325,13 +353,9 @@ export async function ReportDetail({ report }: { report: Report }) {
   const [group, filedBy, shown] = await groupAndFiler(report);
   return (
     <Card>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-lg font-bold">
-            <span aria-hidden="true">{REPORT_TYPE_EMOJI[report.type]} </span>
-            {REPORT_TYPE_LABELS[report.type]}
-          </p>
-          <p className="font-medium text-brand-700">{group?.name}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <ReportIdentity report={report} groupName={group?.name} large />
         </div>
         {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
       </div>
@@ -357,8 +381,8 @@ export function NextFellowshipSummary({ report }: { report: NextFellowship }) {
       className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center gap-2 text-lg font-bold">
-        <CalendarIcon className="text-brand-700" />
-        {formatDateTime(report.proposedDate, report.time)}
+        <DateCalendarIcon date={report.proposedDate} />
+        <span className="min-w-0">{formatDateTime(report.proposedDate, report.time)}</span>
       </div>
       <div className="mt-1 flex items-center gap-2 text-slate-600">
         <MapPinIcon width={18} height={18} className="shrink-0 text-slate-400" />
@@ -498,10 +522,10 @@ export function ReportTypeCard({
     >
       <div className="flex items-center gap-2.5">
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-lg"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-lg text-brand-700"
           aria-hidden="true"
         >
-          {CARD_EMOJI[kind]}
+          {kind === "next-fellowship" ? <CalendarIcon width={20} height={20} /> : CARD_EMOJI[kind]}
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold leading-tight">{CARD_LABELS[kind]}</p>

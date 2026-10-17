@@ -211,6 +211,7 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
 export const REPORT_TYPE_EMOJI: Record<ReportType, string> = {
   fellowship: "📝",
   "follow-up": "📞",
+  // The calendar emoji draws a fixed day. Next-fellowship screens use DateCalendarIcon or CalendarIcon.
   "next-fellowship": "📅",
 };
 
