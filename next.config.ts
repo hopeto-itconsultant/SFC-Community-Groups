@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     "/guide": ["./docs/guide/leader.html", "./docs/guide/admin.html"],
     "/guide/download": ["./docs/SFC CG Leader Guide.pdf", "./docs/SFC CGs Admin Guide.pdf"],
     "/guide/images/*": ["./docs/guide/images/**/*"],
+    "/updates": ["./docs/updates.html"],
+    "/updates/download": ["./docs/updates.pdf"],
   },
   // Lets phones on the home network load dev assets from http://192.168.x.x:3000.
   allowedDevOrigins: ["192.168.*.*"],

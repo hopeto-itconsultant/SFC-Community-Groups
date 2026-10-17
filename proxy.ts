@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { REMEMBER_COOKIE, applyRememberMe, remembersSession } from "@/lib/supabase/remember";
 
-const PUBLIC_PATHS = ["/login", "/manifest.webmanifest", "/sw.js"];
+const PUBLIC_PATHS = ["/login", "/updates", "/manifest.webmanifest", "/sw.js"];
 
 /**
  * Refreshes the Supabase session cookie on every request and sends signed-out

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "./icons";
 
 interface PhotoViewerProps {
@@ -14,12 +15,13 @@ interface PhotoViewerProps {
 /**
  * Full-screen in-app photo viewer. Keeps the PWA open (no new tab).
  * Shows the full-resolution URL with object-contain.
+ * Portaled to document.body so overflow-hidden ancestors cannot clip it.
  */
 export function PhotoViewer({ photos, index: startIndex, onClose, alt = "Photo" }: PhotoViewerProps) {
   const [index, setIndex] = useState(startIndex);
+  const [mounted, setMounted] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
-  const closedByPopRef = useRef(false);
   const titleId = useId();
   const count = photos.length;
   const src = photos[index];
@@ -27,14 +29,19 @@ export function PhotoViewer({ photos, index: startIndex, onClose, alt = "Photo" 
   onCloseRef.current = onClose;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     setIndex(startIndex);
   }, [startIndex]);
 
   useEffect(() => {
+    if (!mounted) return;
+
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
-    closedByPopRef.current = false;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -49,36 +56,25 @@ export function PhotoViewer({ photos, index: startIndex, onClose, alt = "Photo" 
       }
     };
 
-    history.pushState({ photoViewer: true }, "");
-    const onPop = () => {
-      closedByPopRef.current = true;
-      onCloseRef.current();
-    };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("popstate", onPop);
-
     return () => {
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("popstate", onPop);
-      if (!closedByPopRef.current && history.state?.photoViewer) {
-        history.back();
-      }
     };
-  }, [count]);
-
-  if (!src) return null;
+  }, [mounted, count]);
 
   function go(delta: number) {
     setIndex((current) => (current + delta + count) % count);
   }
 
-  return (
+  if (!src || !mounted) return null;
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex flex-col bg-black"
+      className="fixed inset-0 z-[100] flex flex-col bg-black"
     >
       <p id={titleId} className="sr-only">
         {count > 1 ? `${alt} ${index + 1} of ${count}` : alt}
@@ -140,6 +136,7 @@ export function PhotoViewer({ photos, index: startIndex, onClose, alt = "Photo" 
       </div>
 
       <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]" />
-    </div>
+    </div>,
+    document.body,
   );
 }

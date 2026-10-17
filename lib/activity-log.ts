@@ -35,9 +35,27 @@ async function callerIsSuperAdmin(): Promise<boolean> {
   return !!real && isSuperAdmin(real.role);
 }
 
+/** True when this actor is a superadmin (their own use is not logged). */
+async function isSuperAdminActor(
+  actorId: string | null,
+  actorRole: string | null,
+): Promise<boolean> {
+  if (actorRole === "superadmin") return true;
+  const real = await getRealUser();
+  if (real && isSuperAdmin(real.role)) return true;
+  if (!actorId || real?.id === actorId) return false;
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("is_superadmin")
+    .eq("id", actorId)
+    .maybeSingle();
+  return !!data?.is_superadmin;
+}
+
 /**
  * Records one activity row. Schedules the insert with `after()` so the
- * user-facing action is not delayed.
+ * user-facing action is not delayed. Superadmin actions are skipped —
+ * the log is for everyone else.
  */
 export function recordActivity(entry: ActivityEntry): void {
   const summary = clip(entry.summary) ?? entry.action;
@@ -60,6 +78,8 @@ export function recordActivity(entry: ActivityEntry): void {
         actorRole = effective?.role ?? real?.role ?? null;
         actingAsId = real && loginAsId && real.id !== loginAsId ? loginAsId : null;
       }
+
+      if (await isSuperAdminActor(actorId ?? null, actorRole)) return;
 
       await createAdminClient().from("activity_log").insert({
         feature: entry.feature,

@@ -43,6 +43,18 @@ export function timeInputValue(time?: string): string {
   return time ? time.slice(0, 5) : "";
 }
 
+/** True when the clock time is on the hour or half hour. */
+export function isHalfHourTime(time: string): boolean {
+  return /^(?:[01]\d|2[0-3]):(?:00|30)$/.test(time.slice(0, 5));
+}
+
+/** Every :00 and :30 slot in a day, as "HH:MM". */
+export const HALF_HOUR_TIMES: string[] = Array.from({ length: 48 }, (_, i) => {
+  const hour = String(Math.floor(i / 2)).padStart(2, "0");
+  const minute = i % 2 === 0 ? "00" : "30";
+  return `${hour}:${minute}`;
+});
+
 /** Calendar date plus optional "HH:MM" as a timestamp without timezone. Midnight when time is absent. */
 export function combineDateAndTime(date: string, time?: string): string {
   const match = time?.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);

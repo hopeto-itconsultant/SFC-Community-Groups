@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useState } from "react";
 import type { CommunityGroup, CurrentUser, FellowshipReport, NextFellowship } from "@/data/types";
 import { DateTimeField, FiledBy, Field, SubmitBar, dateTimeControlClass, inputClass } from "@/components/form";
+import { HalfHourTimeInput } from "@/components/HalfHourTimeInput";
 import { PhotoPicker, appendKeptPhotos, appendPhotos, storedPhotoItems, usePhotoItems } from "@/components/PhotoPicker";
 import { createFellowshipReport } from "@/lib/actions/reports";
 import type { FormState } from "@/lib/actions/types";
@@ -85,17 +86,15 @@ export function FellowshipForm({
   }
 
   const timeInput = (
-    <input
+    <HalfHourTimeInput
       name="time"
-      type="time"
       required
       aria-label="Time"
       value={time}
-      onChange={(e) => {
-        setTime(e.target.value);
+      onChange={(next) => {
+        setTime(next);
         setError(null);
       }}
-      className={dateTimeControlClass}
     />
   );
 
@@ -132,7 +131,7 @@ export function FellowshipForm({
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 px-4 pt-4">
+    <form noValidate onSubmit={handleSubmit} className="space-y-4 px-4 pt-4">
       {editing ? (
         <DateTimeField label="Date & Time" aside="Today or any earlier date" date={manualDateInput} time={timeInput} />
       ) : choice === OTHER_DATE ? (

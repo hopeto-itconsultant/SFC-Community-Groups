@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type {
@@ -23,6 +24,7 @@ import {
   formatShortDateTime,
   todayISO,
 } from "@/lib/format";
+import { photoVariant } from "@/lib/photos";
 import { CalendarIcon, ChevronRightIcon, MapPinIcon } from "./icons";
 import { PhotoGrid } from "./PhotoGrid";
 import { Badge, Card, InfoRow } from "./ui";
@@ -173,12 +175,21 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
           {!!report.expenseAmount && (
             <span className="shrink-0"> · {formatRupees(report.expenseAmount)}</span>
           )}
-          {report.photos.length > 0 && (
-            <span className="shrink-0"> · {plural(report.photos.length, "photo")}</span>
-          )}
         </div>
         {report.summary && <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">{report.summary}</p>}
       </div>
+      {report.photos[0] && (
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+          <Image
+            src={photoVariant(report.photos[0], 192)}
+            alt=""
+            fill
+            sizes="40px"
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+      )}
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-brand-700" />
     </Link>
   );
