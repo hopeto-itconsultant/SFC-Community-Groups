@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
-import { APP_NAME, THEME_COLOR } from "@/lib/brand";
+import { PWA_NAME, THEME_COLOR } from "@/lib/brand";
 
 /** Installed-app name (home screen and the browser's "couldn't load" page). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: APP_NAME,
-    short_name: APP_NAME,
+    name: PWA_NAME,
+    short_name: PWA_NAME,
     description: "Community Groups management and reporting",
     id: "/",
     start_url: "/home",

@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { DeferredAnalytics } from "@/components/DeferredAnalytics";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
-import { APP_NAME, THEME_COLOR } from "@/lib/brand";
+import { APP_NAME, PWA_NAME, THEME_COLOR } from "@/lib/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: APP_NAME,
+  applicationName: PWA_NAME,
   title: APP_NAME,
   description: "Community Groups management and reporting",
   appleWebApp: {
     capable: true,
-    title: APP_NAME,
+    title: PWA_NAME,
     statusBarStyle: "default",
   },
   icons: {

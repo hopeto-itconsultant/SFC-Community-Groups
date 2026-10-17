@@ -87,7 +87,7 @@ function offlinePage() {
   return new Response(
     `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SFC Community Groups</title>
+<title>CG SFC</title>
 <body style="margin:0;font-family:system-ui,sans-serif;background:#f1f5f9;color:#0f172a">
 <p style="padding:24px">You're offline. Open this page once while online, then it can show again without a connection. Saving a report still needs a connection.</p>`,
     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
