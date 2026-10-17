@@ -165,9 +165,9 @@ function StatusRow({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        {badge && <div className="mb-0.5">{badge}</div>}
         <p className="break-words text-[15px] font-semibold">{label}</p>
         <p className="break-words text-xs text-slate-500">{detail}</p>
+        {badge && <div className="mt-0.5">{badge}</div>}
       </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />
     </Link>
