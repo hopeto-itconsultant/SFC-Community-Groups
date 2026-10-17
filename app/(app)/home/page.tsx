@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { CommunityGroup, CurrentUser } from "@/data/types";
 import { GroupMiniCard, GroupSummaryRow, StatCard } from "@/components/groups";
-import { CalendarIcon, ChevronRightIcon, FileTextIcon } from "@/components/icons";
+import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, FileTextIcon } from "@/components/icons";
 import { InstallBanner } from "@/components/InstallBanner";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
 import { ViewSwitch } from "@/components/ViewToggle";
@@ -137,10 +137,14 @@ function NoGroupHome({ user }: { user: CurrentUser }) {
   );
 }
 
-const ACTIONS = [
-  { href: "/new/fellowship", emoji: "📝", label: "Fellowship" },
-  { href: "/new/follow-up", emoji: "📞", label: "Follow-up" },
-  { href: "/new/next-fellowship", emoji: "📅", label: "Plan Next" },
+const ACTIONS: { href: string; label: string; icon: ReactNode }[] = [
+  { href: "/new/fellowship", label: "Fellowship", icon: "📝" },
+  { href: "/new/follow-up", label: "Follow-up", icon: "📞" },
+  {
+    href: "/new/next-fellowship",
+    label: "Plan Next",
+    icon: <CalendarIcon width={22} height={22} />,
+  },
 ];
 
 function StatusRow({
@@ -149,17 +153,24 @@ function StatusRow({
   label,
   detail,
   badge,
+  framedIcon = true,
 }: {
   href: string;
   icon: ReactNode;
   label: string;
   detail: ReactNode;
   badge?: ReactNode;
+  /** False when `icon` is already a complete chip, such as a dated calendar. */
+  framedIcon?: boolean;
 }) {
   return (
     <Link href={href} prefetch={false} className="flex items-center gap-3 px-3 py-2.5 active:bg-slate-50">
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
+        className={
+          framedIcon
+            ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
+            : "shrink-0"
+        }
         aria-hidden="true"
       >
         {icon}
@@ -184,7 +195,8 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
       {next ? (
         <StatusRow
           href={`/reports/${next.id}`}
-          icon={<CalendarIcon width={18} height={18} />}
+          icon={<DateCalendarIcon date={next.proposedDate} />}
+          framedIcon={false}
           label={`Next · ${formatShortDateTimeDay(next.proposedDate, next.time)}`}
           detail={next.location}
           badge={<Badge tone="green">Upcoming</Badge>}
@@ -257,10 +269,10 @@ async function LeaderHome({ user, group }: { user: CurrentUser; group: Community
               className="flex flex-col items-center gap-1.5 rounded-2xl bg-white px-2 py-3 text-center shadow-sm ring-1 ring-slate-200/70 active:bg-brand-50"
             >
               <span
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-xl"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-xl text-brand-700"
                 aria-hidden="true"
               >
-                {a.emoji}
+                {a.icon}
               </span>
               <span className="text-sm font-semibold leading-tight">{a.label}</span>
             </Link>

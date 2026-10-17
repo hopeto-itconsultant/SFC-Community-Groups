@@ -1,6 +1,9 @@
 import type { SVGProps } from "react";
+import { parseLocalDate } from "@/lib/format";
 
 type IconProps = SVGProps<SVGSVGElement>;
+
+const CALENDAR_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 function Icon({ children, ...props }: IconProps) {
   return (
@@ -111,6 +114,24 @@ export function CalendarIcon(props: IconProps) {
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M3 10h18M8 3v4M16 3v4" />
     </Icon>
+  );
+}
+
+/** Calendar page for one real date. The calendar emoji always draws the same day. */
+export function DateCalendarIcon({ date, className = "" }: { date: string; className?: string }) {
+  const parsed = parseLocalDate(date);
+  return (
+    <span
+      className={`inline-flex h-9 w-9 shrink-0 flex-col overflow-hidden rounded-lg bg-white ring-1 ring-brand-200 ${className}`}
+      aria-hidden="true"
+    >
+      <span className="bg-brand-700 text-center text-[8px] font-bold leading-[13px] tracking-wide text-white">
+        {CALENDAR_MONTHS[parsed.getMonth()]}
+      </span>
+      <span className="flex flex-1 items-center justify-center text-[15px] font-bold leading-none tabular-nums text-slate-900">
+        {parsed.getDate()}
+      </span>
+    </span>
   );
 }
 
