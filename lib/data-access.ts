@@ -246,15 +246,18 @@ const loadReports = cache(
     } else if (period === "upcoming") {
       query = query.eq("type", "next-fellowship").is("cancelled_at", null).gte("report_date", startOfDayTimestamp(today));
     }
+    const soonestFirst = type === "next-fellowship" || period === "upcoming";
     const rows = unwrap<ReportRow[]>(
       "reports",
-      await query.order("report_date", { ascending: false }).order("created_at", { ascending: false }),
+      await query
+        .order("report_date", { ascending: soonestFirst })
+        .order("created_at", { ascending: soonestFirst }),
     );
     return rows.map(toReport);
   },
 );
 
-/** Reports sorted newest first by the date they are about. */
+/** Next fellowships run earliest date first. Other reports run newest first. */
 export async function getReports({ groupId, type, period, withExpense = false }: ReportQuery = {}): Promise<
   Report[]
 > {
