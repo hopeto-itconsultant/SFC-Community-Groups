@@ -96,10 +96,10 @@ export async function GroupMiniCard({ group }: { group: CommunityGroup }) {
         <GroupAvatar group={group} size="xs" />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
-          <NextFellowshipBadge group={group} compact />
           <p className={`break-words text-xs leading-snug ${leaders.length ? "text-slate-600" : "text-slate-400"}`}>
             {namesOrNotAssigned(leaders, shown)}
           </p>
+          <NextFellowshipBadge group={group} compact />
         </div>
       </div>
     </Link>
