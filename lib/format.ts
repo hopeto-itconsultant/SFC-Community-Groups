@@ -34,6 +34,16 @@ export function formatDateTime(iso: string, time?: string): string {
   return time ? `${formatDate(iso)}, ${formatTime(time)}` : formatDate(iso);
 }
 
+/** "2026-10-31" -> "Sat". */
+export function weekdayName(iso: string): string {
+  return WEEKDAYS[parseLocalDate(iso).getDay()];
+}
+
+/** Date, time when recorded, then the weekday: "31 Oct 2026, 5:00 PM, Sat". */
+export function formatDateTimeDay(iso: string, time?: string): string {
+  return `${formatDateTime(iso, time)}, ${weekdayName(iso)}`;
+}
+
 /** Short date, with the time appended when one was recorded. */
 export function formatShortDateTime(iso: string, time?: string): string {
   return time ? `${formatShortDate(iso)}, ${formatTime(time)}` : formatShortDate(iso);
@@ -41,8 +51,12 @@ export function formatShortDateTime(iso: string, time?: string): string {
 
 /** Short date, time when recorded, then the weekday: "31 Oct, 5:00 PM, Sat". */
 export function formatShortDateTimeDay(iso: string, time?: string): string {
-  const day = WEEKDAYS[parseLocalDate(iso).getDay()];
-  return `${formatShortDateTime(iso, time)}, ${day}`;
+  return `${formatShortDateTime(iso, time)}, ${weekdayName(iso)}`;
+}
+
+/** Short date, then the weekday: "31 Oct, Sat". */
+export function formatShortDateDay(iso: string): string {
+  return `${formatShortDate(iso)}, ${weekdayName(iso)}`;
 }
 
 /** "HH:MM:SS" from the database as the "HH:MM" a time input expects. */

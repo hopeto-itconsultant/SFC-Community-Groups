@@ -18,10 +18,11 @@ import {
   REPORT_TYPE_LABELS,
   contactModeLabel,
   formatDate,
-  formatDateTime,
+  formatDateTimeDay,
   formatRupees,
   formatShortDate,
-  formatShortDateTime,
+  formatShortDateDay,
+  formatShortDateTimeDay,
   todayISO,
 } from "@/lib/format";
 import { photoVariant } from "@/lib/photos";
@@ -50,7 +51,7 @@ function CardSummary({ report, shown }: { report: Report; shown: NameDisplay }) 
     case "fellowship":
       return (
         <>
-          <p className="text-slate-500">{formatDateTime(report.date, report.time)}</p>
+          <p className="text-slate-500">{formatDateTimeDay(report.date, report.time)}</p>
           <p className="mt-2 font-semibold">{plural(report.attendees, "attendee")}</p>
           <p className="text-sm text-slate-600">
             {plural(report.firstTimers, "first-time attendee")}
@@ -68,7 +69,7 @@ function CardSummary({ report, shown }: { report: Report; shown: NameDisplay }) 
     case "next-fellowship":
       return (
         <>
-          <p className="text-slate-500">{formatDateTime(report.proposedDate, report.time)}</p>
+          <p className="text-slate-500">{formatDateTimeDay(report.proposedDate, report.time)}</p>
           <p className="mt-2 font-semibold">{report.location}</p>
           <p className="line-clamp-2 text-sm text-slate-600">{report.activity}</p>
         </>
@@ -160,7 +161,7 @@ export async function ExpenseCard({ report }: { report: FellowshipReport }) {
           <p className="text-lg font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
           <p className="truncate text-sm font-medium text-brand-700">{group?.name}</p>
         </div>
-        <p className="shrink-0 text-sm text-slate-500">{formatDateTime(report.date, report.time)}</p>
+        <p className="shrink-0 text-sm text-slate-500">{formatDateTimeDay(report.date, report.time)}</p>
       </div>
       {report.expenseDetails && (
         <p className="mt-2 line-clamp-2 text-sm text-slate-600">{report.expenseDetails}</p>
@@ -188,7 +189,7 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <p className="shrink-0 text-sm font-bold">{formatShortDateTime(report.date, report.time)}</p>
+          <p className="shrink-0 text-sm font-bold">{formatShortDateTimeDay(report.date, report.time)}</p>
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
           <p className="shrink-0 text-sm">
             <span className="font-bold">{report.attendees}</span>
@@ -300,7 +301,7 @@ function TextBlock({ label, children }: { label: string; children: ReactNode }) 
 function FellowshipDetail({ report }: { report: FellowshipReport }) {
   return (
     <>
-      <InfoRow label="Date">{formatDateTime(report.date, report.time)}</InfoRow>
+      <InfoRow label="Date">{formatDateTimeDay(report.date, report.time)}</InfoRow>
       <InfoRow label="Location">{report.location}</InfoRow>
       <div className="grid grid-cols-2 gap-4">
         <InfoRow label="Attendees">{report.attendees}</InfoRow>
@@ -339,7 +340,7 @@ function FollowUpDetail({ report, shown }: { report: FollowUpReport; shown: Name
 function NextFellowshipDetail({ report }: { report: NextFellowship }) {
   return (
     <>
-      <InfoRow label="Proposed Date">{formatDateTime(report.proposedDate, report.time)}</InfoRow>
+      <InfoRow label="Proposed Date">{formatDateTimeDay(report.proposedDate, report.time)}</InfoRow>
       <InfoRow label="Location">{report.location}</InfoRow>
       <TextBlock label="Activity & Discussion">{report.activity}</TextBlock>
       <TextBlock label="Goals">{report.goals}</TextBlock>
@@ -382,7 +383,7 @@ export function NextFellowshipSummary({ report }: { report: NextFellowship }) {
     >
       <div className="flex items-center gap-2 text-lg font-bold">
         <DateCalendarIcon date={report.proposedDate} />
-        <span className="min-w-0">{formatDateTime(report.proposedDate, report.time)}</span>
+        <span className="min-w-0">{formatDateTimeDay(report.proposedDate, report.time)}</span>
       </div>
       <div className="mt-1 flex items-center gap-2 text-slate-600">
         <MapPinIcon width={18} height={18} className="shrink-0 text-slate-400" />
@@ -434,7 +435,7 @@ function NextFellowshipTypeBody({ summary }: { summary: ReportTypeSummaries["nex
   if (!nextDate) return <EmptyNote>No upcoming fellowship planned</EmptyNote>;
   return (
     <div className="grid grid-cols-3 gap-2">
-      <StatTile value={summary.nextDateCount} label={formatShortDate(nextDate)} />
+      <StatTile value={summary.nextDateCount} label={formatShortDateDay(nextDate)} />
       <StatTile value={summary.thisWeekCount} label="This week" />
       <StatTile value={summary.thisMonthCount} label="This month" />
     </div>
@@ -452,9 +453,11 @@ function ExpenditureTypeBody({ summary }: { summary: ReportTypeSummaries["expend
   );
 }
 
-function withLastDate(total: number, word: string, lastDate: string | undefined) {
+function withLastDate(total: number, word: string, lastDate: string | undefined, withDay = false) {
   const count = plural(total, word);
-  return lastDate ? `${count} · Last ${formatShortDate(lastDate)}` : count;
+  if (!lastDate) return count;
+  const when = withDay ? formatShortDateDay(lastDate) : formatShortDate(lastDate);
+  return `${count} · Last ${when}`;
 }
 
 /** Report types plus the expenditure view, which is derived from fellowship reports. */
@@ -484,7 +487,7 @@ function typeCardMeta(kind: ReportCardKind, summaries: ReportTypeSummaries) {
     case "fellowship": {
       const { total, lastDate } = summaries.fellowship;
       return {
-        subtitle: withLastDate(total, "report", lastDate),
+        subtitle: withLastDate(total, "report", lastDate, true),
         body: <FellowshipTypeBody summary={summaries.fellowship} />,
       };
     }
@@ -546,7 +549,7 @@ export function LastFellowshipSummary({ report }: { report: FellowshipReport }) 
       className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <div className="flex items-center justify-between">
-        <p className="text-lg font-bold">{formatDateTime(report.date, report.time)}</p>
+        <p className="text-lg font-bold">{formatDateTimeDay(report.date, report.time)}</p>
         <span className="flex items-center text-sm font-semibold text-brand-700">
           View <ChevronRightIcon width={18} height={18} />
         </span>

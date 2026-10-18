@@ -7,7 +7,7 @@ import { HalfHourTimeInput } from "@/components/HalfHourTimeInput";
 import { PhotoPicker, appendKeptPhotos, appendPhotos, storedPhotoItems, usePhotoItems } from "@/components/PhotoPicker";
 import { createFellowshipReport } from "@/lib/actions/reports";
 import type { FormState } from "@/lib/actions/types";
-import { formatDateTime, timeInputValue, todayISO } from "@/lib/format";
+import { formatDateTimeDay, timeInputValue, todayISO } from "@/lib/format";
 
 const OTHER_DATE = "other";
 
@@ -107,7 +107,7 @@ export function FellowshipForm({
     >
       {plans.map((item) => (
         <option key={item.id} value={item.proposedDate}>
-          {formatDateTime(item.proposedDate, item.time)}
+          {formatDateTimeDay(item.proposedDate, item.time)}
         </option>
       ))}
       <option value={OTHER_DATE}>Other date</option>
