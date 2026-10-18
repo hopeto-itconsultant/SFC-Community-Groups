@@ -92,16 +92,16 @@ export async function GroupMiniCard({ group }: { group: CommunityGroup }) {
       prefetch={false}
       className="cv-item flex h-full flex-col gap-1.5 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5">
-        <div className="row-span-2">
-          <GroupAvatar group={group} size="xs" />
+      <div className="flex items-center gap-2">
+        <GroupAvatar group={group} size="xs" />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
+          <p className={`break-words text-xs leading-snug ${leaders.length ? "text-slate-600" : "text-slate-400"}`}>
+            {namesOrNotAssigned(leaders, shown)}
+          </p>
+          <NextFellowshipBadge group={group} compact />
         </div>
-        <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
-        <p className={`break-words text-xs leading-snug ${leaders.length ? "text-slate-600" : "text-slate-400"}`}>
-          {namesOrNotAssigned(leaders, shown)}
-        </p>
       </div>
-      <NextFellowshipBadge group={group} compact />
     </Link>
   );
 }
