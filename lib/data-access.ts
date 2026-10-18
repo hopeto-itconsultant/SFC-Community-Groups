@@ -562,9 +562,12 @@ export interface LeaderProfileGroup {
 export interface LeaderProfile {
   id: string;
   name: string;
+  mobile?: string;
   dateOfBirth?: string;
   email?: string;
   servingSince?: string;
+  /** True when they already sign in. The mobile number is then required. */
+  hasLogin: boolean;
   active: boolean;
   groups: LeaderProfileGroup[];
 }
@@ -577,9 +580,11 @@ export async function getLeaderProfile(profileId: string): Promise<LeaderProfile
     | {
         id: string;
         name: string;
+        mobile: string | null;
         date_of_birth: string | null;
         email: string | null;
         serving_since: string | null;
+        auth_user_id: string | null;
         active: boolean;
         is_admin: boolean;
         group_leaders: {
@@ -592,7 +597,9 @@ export async function getLeaderProfile(profileId: string): Promise<LeaderProfile
     "leader",
     await supabase
       .from("profiles")
-      .select("id, name, date_of_birth, email, serving_since, active, is_admin, group_leaders(role, groups(id, name, status))")
+      .select(
+        "id, name, mobile, date_of_birth, email, serving_since, auth_user_id, active, is_admin, group_leaders(role, groups(id, name, status))",
+      )
       .eq("id", profileId)
       .maybeSingle(),
   );
@@ -604,9 +611,11 @@ export async function getLeaderProfile(profileId: string): Promise<LeaderProfile
   return {
     id: row.id,
     name: row.name,
+    mobile: row.mobile ?? undefined,
     dateOfBirth: row.date_of_birth ?? undefined,
     email: row.email ?? undefined,
     servingSince: row.serving_since ?? undefined,
+    hasLogin: !!row.auth_user_id,
     active: row.active,
     groups,
   };
@@ -615,9 +624,12 @@ export async function getLeaderProfile(profileId: string): Promise<LeaderProfile
 export interface AssistantLeader {
   id: string;
   name: string;
+  mobile?: string;
   dateOfBirth?: string;
   email?: string;
   servingSince?: string;
+  /** True when they already sign in. The mobile number is then required. */
+  hasLogin: boolean;
   active: boolean;
   groups: { id: string; name: string; status: GroupStatus }[];
 }
@@ -636,9 +648,11 @@ export async function getAssistantLeaders(groupIds: string[], excludeProfileId: 
       profiles: {
         id: string;
         name: string;
+        mobile: string | null;
         date_of_birth: string | null;
         email: string | null;
         serving_since: string | null;
+        auth_user_id: string | null;
         active: boolean;
         is_admin: boolean;
       } | null;
@@ -648,7 +662,9 @@ export async function getAssistantLeaders(groupIds: string[], excludeProfileId: 
     "assistant leaders",
     await supabase
       .from("group_leaders")
-      .select("profiles(id, name, date_of_birth, email, serving_since, active, is_admin), groups(id, name, status)")
+      .select(
+        "profiles(id, name, mobile, date_of_birth, email, serving_since, auth_user_id, active, is_admin), groups(id, name, status)",
+      )
       .eq("role", "asst-leader")
       .in("group_id", ids),
   );
@@ -667,9 +683,11 @@ export async function getAssistantLeaders(groupIds: string[], excludeProfileId: 
     byId.set(profile.id, {
       id: profile.id,
       name: profile.name,
+      mobile: profile.mobile ?? undefined,
       dateOfBirth: profile.date_of_birth ?? undefined,
       email: profile.email ?? undefined,
       servingSince: profile.serving_since ?? undefined,
+      hasLogin: !!profile.auth_user_id,
       active: profile.active,
       groups: [groupRef],
     });

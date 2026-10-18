@@ -3,8 +3,10 @@
 import { useActionState } from "react";
 import { Field, inputClass } from "@/components/form";
 import { LeaderDetailFields } from "@/components/LeaderDetailFields";
+import { MobileFields } from "@/components/MobileFields";
 import { Button, Card } from "@/components/ui";
 import { updateMemberDetails, type MemberDetailsState } from "@/lib/actions/people";
+import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
 import type { LeaderProfile } from "@/lib/data-access";
 
 export function LeaderDetailsForm({ leader }: { leader: LeaderProfile }) {
@@ -12,6 +14,7 @@ export function LeaderDetailsForm({ leader }: { leader: LeaderProfile }) {
     updateMemberDetails.bind(null, leader.id),
     {},
   );
+  const stored = leader.mobile ? splitMobile(leader.mobile) : { iso: DEFAULT_COUNTRY_ISO, national: "" };
 
   return (
     <Card>
@@ -27,6 +30,12 @@ export function LeaderDetailsForm({ leader }: { leader: LeaderProfile }) {
             className={inputClass}
           />
         </Field>
+        <MobileFields
+          required={leader.hasLogin}
+          country={state.values?.country ?? stored.iso}
+          mobile={state.values?.mobile ?? stored.national}
+          aside="Without the country code."
+        />
         <LeaderDetailFields
           dateOfBirth={state.values?.dateOfBirth ?? leader.dateOfBirth}
           email={state.values?.email ?? leader.email}

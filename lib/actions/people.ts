@@ -65,7 +65,7 @@ export interface AddMemberState extends FormState {
 
 export interface MemberDetailsState extends FormState {
   /** What was typed, so the form keeps it after an error. */
-  values?: LeaderDetailValues & { name?: string };
+  values?: LeaderDetailValues & { name?: string; country?: string; mobile?: string };
   /** Set after the person's details are saved. */
   saved?: boolean;
 }
@@ -280,7 +280,52 @@ export async function addRosterMember(_prev: AddMemberState, formData: FormData)
 }
 
 /**
- * Saves date of birth, email, and the date they started serving. Blank fields clear the stored value.
+ * Saves the mobile number when the form includes one, and keeps sign-in working.
+ * A blank number is stored only when they do not already sign in with it.
+ * Returns an error message, or null.
+ */
+async function saveDetailsMobile(profileId: string, nextMobile: string | null): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("id, mobile, auth_user_id, username")
+    .eq("id", profileId)
+    .eq("is_admin", false)
+    .maybeSingle();
+  if (error || !profile) return "Could not find that person.";
+  if (nextMobile === profile.mobile) return null;
+  if (!nextMobile && profile.auth_user_id && !profile.username) {
+    return "Enter a mobile number. They sign in with it.";
+  }
+  if (nextMobile) {
+    const taken = await mobileTakenBy(admin, nextMobile, profileId);
+    if (taken) return taken;
+  }
+
+  if (profile.auth_user_id && !profile.username && nextMobile) {
+    const { error: authError } = await admin.auth.admin.updateUserById(profile.auth_user_id, {
+      email: loginEmailForMobile(nextMobile),
+      email_confirm: true,
+    });
+    if (authError) return `Could not update the sign-in number: ${authError.message}`;
+  }
+
+  const { error: mobileError } = await admin.from("profiles").update({ mobile: nextMobile }).eq("id", profileId);
+  if (mobileError) {
+    if (profile.auth_user_id && !profile.username && nextMobile && profile.mobile) {
+      await admin.auth.admin.updateUserById(profile.auth_user_id, {
+        email: loginEmailForMobile(profile.mobile),
+        email_confirm: true,
+      });
+    }
+    return `Could not save the mobile number: ${mobileError.message}`;
+  }
+  return null;
+}
+
+/**
+ * Saves date of birth, email, the date they started serving, and the mobile number when the form has one.
+ * Blank date and email fields clear the stored value. A blank mobile number does too, unless they sign in with it.
  * A submitted name is saved too. A form without a name field leaves the name as it is.
  * An Admin may save any leader. A leader may save themselves and the assistant leaders of a group they lead.
  */
@@ -290,9 +335,11 @@ export async function updateMemberDetails(
   formData: FormData,
 ): Promise<MemberDetailsState> {
   const rawName = formData.get("name");
+  const phone = formData.has("mobile") ? readMobileFields(formData) : null;
   const values = {
     ...detailValues(formData),
     ...(rawName === null ? {} : { name: String(rawName) }),
+    ...(phone ? { country: phone.country, mobile: phone.national } : {}),
   };
   const fail = (error: string): MemberDetailsState => {
     trackFail("people", "member_details_update", "Leader details update failed", error);
@@ -304,12 +351,18 @@ export async function updateMemberDetails(
 
   const read = readLeaderDetails(values);
   if ("error" in read) return fail(read.error);
+  if (phone?.national && !phone.mobile) return fail("Enter a valid mobile number, e.g. 9876543210.");
 
   let name: string | undefined;
   if (rawName !== null) {
     const parsed = personNameSchema.safeParse(String(rawName));
     if (!parsed.success) return fail(parsed.error.issues[0].message);
     name = parsed.data;
+  }
+
+  if (phone) {
+    const mobileError = await saveDetailsMobile(profileId, phone.mobile);
+    if (mobileError) return fail(mobileError);
   }
 
   const supabase = await createClient();

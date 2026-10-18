@@ -7,14 +7,17 @@ export function MobileFields({
   mobile = "",
   required = false,
   hint,
+  aside,
 }: {
   country?: string;
   mobile?: string;
   required?: boolean;
   hint?: string;
+  /** Short note on the label row, such as "Without the country code." */
+  aside?: string;
 }) {
   return (
-    <Field label="Mobile number" required={required} hint={hint}>
+    <Field label="Mobile number" required={required} hint={hint} aside={aside}>
       <div className="flex flex-nowrap items-start gap-2">
         <div className="w-[7rem] min-w-[7rem] max-w-[7rem] shrink-0 overflow-hidden">
           <select

@@ -144,8 +144,16 @@ function DetailsForm({ member, onDone }: { member: GroupMember; onDone: () => vo
     if (state.saved) onDone();
   }, [state.saved, onDone]);
 
+  const stored = member.mobile ? splitMobile(member.mobile) : { iso: DEFAULT_COUNTRY_ISO, national: "" };
+
   return (
     <form action={action} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+      <MobileFields
+        required={member.hasLogin}
+        country={state.values?.country ?? stored.iso}
+        mobile={state.values?.mobile ?? stored.national}
+        aside="Without the country code."
+      />
       <LeaderDetailFields
         dateOfBirth={state.values?.dateOfBirth ?? member.dateOfBirth}
         email={state.values?.email ?? member.email}

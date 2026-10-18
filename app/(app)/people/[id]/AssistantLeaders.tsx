@@ -3,8 +3,10 @@
 import { useActionState, useEffect, useState } from "react";
 import { Field, inputClass } from "@/components/form";
 import { LeaderDetailFields } from "@/components/LeaderDetailFields";
+import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, SectionTitle } from "@/components/ui";
 import { updateMemberDetails, type MemberDetailsState } from "@/lib/actions/people";
+import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
 import type { AssistantLeader } from "@/lib/data-access";
 import { formatDate } from "@/lib/format";
 import { useDisplayName } from "@/lib/session";
@@ -56,6 +58,7 @@ function AssistantCard({ assistant, showGroups }: { assistant: AssistantLeader; 
       ) : (
         <>
           <dl className="mt-2 space-y-0.5 text-sm text-slate-600">
+            <DetailLine label="Mobile" value={assistant.mobile} />
             <DetailLine label="Date of birth" value={assistant.dateOfBirth ? formatDate(assistant.dateOfBirth) : undefined} />
             <DetailLine label="Email" value={assistant.email} breakAll />
             <DetailLine label="Started serving" value={assistant.servingSince ? formatDate(assistant.servingSince) : undefined} />
@@ -90,6 +93,8 @@ function DetailsForm({ assistant, onDone }: { assistant: AssistantLeader; onDone
     if (state.saved) onDone();
   }, [state.saved, onDone]);
 
+  const stored = assistant.mobile ? splitMobile(assistant.mobile) : { iso: DEFAULT_COUNTRY_ISO, national: "" };
+
   return (
     <form action={action} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
       <Field label="Name" required>
@@ -103,6 +108,12 @@ function DetailsForm({ assistant, onDone }: { assistant: AssistantLeader; onDone
           className={inputClass}
         />
       </Field>
+      <MobileFields
+        required={assistant.hasLogin}
+        country={state.values?.country ?? stored.iso}
+        mobile={state.values?.mobile ?? stored.national}
+        aside="Without the country code."
+      />
       <LeaderDetailFields
         dateOfBirth={state.values?.dateOfBirth ?? assistant.dateOfBirth}
         email={state.values?.email ?? assistant.email}
