@@ -116,7 +116,7 @@ async function ReportsOverview({ scope: { isAdmin, groupId, subtitle } }: { scop
   );
 }
 
-/** Keeps getReports order: newest event date first, including within one day. */
+/** Keeps getReports order, including the order of reports on the same day. */
 function groupReportsByDate(reports: Report[]): Map<string, Report[]> {
   const grouped = new Map<string, Report[]>();
   for (const report of reports) {
