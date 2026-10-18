@@ -110,7 +110,7 @@ function MiniInfo({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="truncate text-xs text-slate-700">{children}</dd>
+      <dd className="break-words text-xs text-slate-700">{children}</dd>
     </div>
   );
 }
@@ -149,8 +149,8 @@ export async function GroupDetailCard({ group }: { group: CommunityGroup }) {
         )}
       </div>
       <div className="p-3">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug">{group.name}</p>
-        {group.category && <p className="truncate text-xs text-slate-500">{group.category}</p>}
+        <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
+        {group.category && <p className="break-words text-xs text-slate-500">{group.category}</p>}
         <dl className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
           <MiniInfo label={leaders.length > 1 ? "Leaders" : "Leader"}>
             <span className={leaders.length ? "" : "text-slate-400"}>{namesOrNotAssigned(leaders, shown)}</span>
@@ -164,7 +164,7 @@ export async function GroupDetailCard({ group }: { group: CommunityGroup }) {
   );
 }
 
-/** One-line group summary used on the Admin dashboard; place inside a divided Card. */
+/** Group summary used on the Admin dashboard; place inside a divided Card. */
 export async function GroupSummaryRow({ group }: { group: CommunityGroup }) {
   const [leaders, shown] = await Promise.all([getGroupLeaders(group), getNameDisplay()]);
 
@@ -176,7 +176,7 @@ export async function GroupSummaryRow({ group }: { group: CommunityGroup }) {
     >
       <GroupAvatar group={group} size="sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold">{group.name}</p>
+        <p className="break-words text-[15px] font-semibold">{group.name}</p>
         <p className={`break-words text-xs ${leaders.length ? "text-slate-500" : "text-slate-400"}`}>
           {namesOrNotAssigned(leaders, shown)}
         </p>
@@ -198,12 +198,12 @@ export async function GroupListItem({ group }: { group: CommunityGroup }) {
     <Link
       href={`/groups/${group.id}`}
       prefetch={false}
-      className="cv-item flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
+      className="cv-item flex items-start gap-3 rounded-2xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
       <GroupAvatar group={group} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-sm">
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 break-words text-sm">
             <span className="font-bold">{group.name}</span>
             {group.category && <span className="text-slate-500"> · {group.category}</span>}
             <span className={leaders.length ? "text-slate-700" : "text-slate-400"}>
@@ -211,13 +211,17 @@ export async function GroupListItem({ group }: { group: CommunityGroup }) {
               {namesOrNotAssigned(leaders, shown)}
             </span>
           </p>
-          {isGroupClosed(group) && <ClosedBadge />}
+          {isGroupClosed(group) && (
+            <span className="shrink-0">
+              <ClosedBadge />
+            </span>
+          )}
         </div>
-        <p className={`truncate text-sm ${assistants.length ? "text-slate-500" : "text-slate-400"}`}>
+        <p className={`break-words text-sm ${assistants.length ? "text-slate-500" : "text-slate-400"}`}>
           {namesOrNotAssigned(assistants, shown)}
         </p>
       </div>
-      <ChevronRightIcon className="shrink-0 text-slate-400" />
+      <ChevronRightIcon className="mt-0.5 shrink-0 text-slate-400" />
     </Link>
   );
 }

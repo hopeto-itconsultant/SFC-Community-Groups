@@ -32,14 +32,13 @@ export function PageHeader({
         )}
         <div className="min-w-0 flex-1 py-2">
           {note ? (
-            <h1 className="flex min-w-0 items-baseline gap-2 leading-tight">
-              <span className="shrink-0 text-lg font-bold">{title}</span>
-              <span className="min-w-0 truncate text-sm font-normal text-slate-500">{note}</span>
+            <h1 className="break-words text-lg font-bold leading-tight">
+              {title} <span className="text-sm font-normal text-slate-500">{note}</span>
             </h1>
           ) : (
-            <h1 className="truncate text-lg font-bold leading-tight">{title}</h1>
+            <h1 className="break-words text-lg font-bold leading-tight">{title}</h1>
           )}
-          {subtitle && !note && <p className="truncate text-sm text-slate-500">{subtitle}</p>}
+          {subtitle && !note && <p className="break-words text-sm text-slate-500">{subtitle}</p>}
         </div>
         {action && <div className="shrink-0 pr-2">{action}</div>}
       </div>
