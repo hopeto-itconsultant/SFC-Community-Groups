@@ -109,7 +109,7 @@ function DetailsForm({ assistant, onDone }: { assistant: AssistantLeader; onDone
         />
       </Field>
       <MobileFields
-        required={assistant.hasLogin}
+        required={Boolean(assistant.mobile)}
         country={state.values?.country ?? stored.iso}
         mobile={state.values?.mobile ?? stored.national}
         aside="Without the country code."

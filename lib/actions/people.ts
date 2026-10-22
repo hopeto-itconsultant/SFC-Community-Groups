@@ -11,6 +11,7 @@ import {
   MOBILE_PATTERN,
   USERNAME_RULE,
   loginEmailForMobile,
+  loginEmailForPendingProfile,
   loginEmailForUsername,
   normalizeUsername,
 } from "@/lib/login-id";
@@ -224,6 +225,7 @@ export async function addMember(
     const { data } = await supabase.from("profiles").select("id").eq("mobile", mobile).maybeSingle();
     profileId = data?.id;
   }
+  let createdProfile = false;
   if (!profileId) {
     const { data, error } = await supabase
       .from("profiles")
@@ -238,6 +240,7 @@ export async function addMember(
       .single();
     if (error) return fail(`Could not add the person: ${error.message}`);
     profileId = data.id;
+    createdProfile = true;
   } else {
     const patch: { date_of_birth?: string; email?: string; serving_since?: string } = {};
     if (details.dateOfBirth) patch.date_of_birth = details.dateOfBirth;
@@ -246,6 +249,24 @@ export async function addMember(
     if (Object.keys(patch).length) {
       const { error } = await supabase.from("profiles").update(patch).eq("id", profileId);
       if (error) return fail(`Could not save the details: ${error.message}`);
+    }
+  }
+
+  const admin = createAdminClient();
+  const { data: account, error: accountError } = await admin
+    .from("profiles")
+    .select("id, auth_user_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (accountError || !account) {
+    if (createdProfile) await admin.from("profiles").delete().eq("id", profileId);
+    return fail(accountError ? `Could not create the login: ${accountError.message}` : "Could not find that person.");
+  }
+  if (!account.auth_user_id) {
+    const loginError = await ensureDefaultLogin(admin, account, mobile);
+    if (loginError) {
+      if (createdProfile) await admin.from("profiles").delete().eq("id", profileId);
+      return fail(loginError);
     }
   }
 
@@ -281,7 +302,11 @@ export async function addRosterMember(_prev: AddMemberState, formData: FormData)
 
 /**
  * Saves the mobile number when the form includes one, and keeps sign-in working.
- * A blank number is stored only when they do not already sign in with it.
+ * A blank number is left unchanged when they do not already sign in with one,
+ * including while a placeholder login is waiting. Clearing a number they sign in
+ * with is refused.
+ * A new number points the existing login at that number and does not change the
+ * password. Someone with no login yet gets the starting password.
  * Returns an error message, or null.
  */
 async function saveDetailsMobile(profileId: string, nextMobile: string | null): Promise<string | null> {
@@ -294,27 +319,37 @@ async function saveDetailsMobile(profileId: string, nextMobile: string | null): 
     .maybeSingle();
   if (error || !profile) return "Could not find that person.";
   if (nextMobile === profile.mobile) return null;
-  if (!nextMobile && profile.auth_user_id && !profile.username) {
-    return "Enter a mobile number. They sign in with it.";
+  if (!nextMobile) {
+    if (profile.mobile && profile.auth_user_id && !profile.username) {
+      return "Enter a mobile number. They sign in with it.";
+    }
+    if (!profile.mobile) return null;
   }
   if (nextMobile) {
     const taken = await mobileTakenBy(admin, nextMobile, profileId);
     if (taken) return taken;
   }
 
-  if (profile.auth_user_id && !profile.username && nextMobile) {
+  const hadLogin = Boolean(profile.auth_user_id);
+  if (nextMobile && profile.auth_user_id && !profile.username) {
     const { error: authError } = await admin.auth.admin.updateUserById(profile.auth_user_id, {
       email: loginEmailForMobile(nextMobile),
       email_confirm: true,
     });
     if (authError) return `Could not update the sign-in number: ${authError.message}`;
+  } else if (nextMobile && !profile.auth_user_id) {
+    const loginError = await ensureDefaultLogin(admin, profile, nextMobile);
+    if (loginError) return loginError;
   }
 
   const { error: mobileError } = await admin.from("profiles").update({ mobile: nextMobile }).eq("id", profileId);
   if (mobileError) {
-    if (profile.auth_user_id && !profile.username && nextMobile && profile.mobile) {
+    if (!hadLogin && profile.auth_user_id) {
+      await admin.auth.admin.deleteUser(profile.auth_user_id);
+      await admin.from("profiles").update({ auth_user_id: null }).eq("id", profileId);
+    } else if (hadLogin && profile.auth_user_id && !profile.username && nextMobile) {
       await admin.auth.admin.updateUserById(profile.auth_user_id, {
-        email: loginEmailForMobile(profile.mobile),
+        email: profile.mobile ? loginEmailForMobile(profile.mobile) : loginEmailForPendingProfile(profile.id),
         email_confirm: true,
       });
     }
@@ -421,6 +456,38 @@ export async function removeMember(groupId: string, profileId: string): Promise<
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>;
+
+/**
+ * Creates a login with the starting password when this person has none.
+ * With a mobile number, that number is the sign-in address. Without one, the
+ * login waits on a placeholder address and cannot be used yet.
+ * An existing login is left unchanged, including its password.
+ * Returns an error message, or null. Sets `profile.auth_user_id` when it creates one.
+ */
+async function ensureDefaultLogin(
+  admin: AdminClient,
+  profile: { id: string; auth_user_id: string | null },
+  mobile: string | null,
+): Promise<string | null> {
+  if (profile.auth_user_id) return null;
+  const email = mobile ? loginEmailForMobile(mobile) : loginEmailForPendingProfile(profile.id);
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    password: DEFAULT_PASSWORD,
+    email_confirm: true,
+  });
+  if (error || !created.user) return `Could not create the login: ${error?.message ?? "no user was returned."}`;
+  const { error: linkError } = await admin
+    .from("profiles")
+    .update({ auth_user_id: created.user.id })
+    .eq("id", profile.id);
+  if (linkError) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    return `Could not link the login: ${linkError.message}`;
+  }
+  profile.auth_user_id = created.user.id;
+  return null;
+}
 
 /** Creates the login or replaces its mobile and password. Returns an error message, or null. */
 async function writeLogin(

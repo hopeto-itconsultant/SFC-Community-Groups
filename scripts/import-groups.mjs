@@ -1,7 +1,7 @@
 // Imports the community groups and leader rosters from the prototype
 // (data/groups.ts, data/users.ts) into an empty database, uploading the group
-// photos from public/groups/. Leaders are created without logins; the Admin
-// sets those up in the app (Groups > a group > Leaders & logins).
+// photos from public/groups/. Each leader gets a login with the starting
+// password. They can sign in once a mobile number is saved.
 // Refuses to run if the database already has groups.
 //
 // Usage: npm run import-groups   (reads .env.local; run create-admin first)
@@ -9,6 +9,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { groups } from "../data/groups.ts";
 import { users } from "../data/users.ts";
+import { loginEmailForPendingProfile } from "../lib/login-id.ts";
+import { DEFAULT_PASSWORD } from "../lib/passwords.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -48,6 +50,22 @@ const profileIds = new Map();
 for (const u of leaders) {
   const { data, error } = await supabase.from("profiles").insert({ name: u.name }).select("id").single();
   if (error) fail(`Adding ${u.name}: ${error.message}`);
+  const { data: created, error: authError } = await supabase.auth.admin.createUser({
+    email: loginEmailForPendingProfile(data.id),
+    password: DEFAULT_PASSWORD,
+    email_confirm: true,
+  });
+  if (authError || !created.user) {
+    fail(`Creating the login for ${u.name}: ${authError?.message ?? "no user was returned."}`);
+  }
+  const { error: linkError } = await supabase
+    .from("profiles")
+    .update({ auth_user_id: created.user.id })
+    .eq("id", data.id);
+  if (linkError) {
+    await supabase.auth.admin.deleteUser(created.user.id);
+    fail(`Linking the login for ${u.name}: ${linkError.message}`);
+  }
   profileIds.set(u.id, data.id);
 }
 
@@ -96,4 +114,4 @@ for (const g of groups) {
   console.log(`  ${g.name}: ${memberships.length} leaders${photoPath ? ", photo" : ""}`);
 }
 
-console.log(`Done. ${leaders.length} leaders added without logins; set those up in the app.`);
+console.log(`Done. ${leaders.length} leaders added. Each can sign in once a mobile number is saved.`);

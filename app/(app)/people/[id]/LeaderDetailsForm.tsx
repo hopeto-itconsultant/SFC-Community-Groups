@@ -31,7 +31,7 @@ export function LeaderDetailsForm({ leader }: { leader: LeaderProfile }) {
           />
         </Field>
         <MobileFields
-          required={leader.hasLogin}
+          required={Boolean(leader.mobile)}
           country={state.values?.country ?? stored.iso}
           mobile={state.values?.mobile ?? stored.national}
           aside="Without the country code."

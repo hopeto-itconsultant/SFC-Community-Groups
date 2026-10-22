@@ -27,7 +27,7 @@ async function GroupPeople({ id }: { id: string }) {
       <PageHeader title="Leaders & logins" subtitle={group.name} backHref={`/groups/${group.id}`} />
       <div className="p-4">
         <p className="px-1 text-sm text-slate-500">
-          Leaders and assistant leaders sign in with their mobile number and a password you set here.
+          Leaders and assistant leaders sign in with their mobile number and the starting password. Adding or changing the number keeps that password.
         </p>
 
         <SectionTitle>People</SectionTitle>

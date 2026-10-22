@@ -45,6 +45,14 @@ export function loginEmailForUsername(username: string): string {
   return `u.${username}@${LOGIN_EMAIL_DOMAIN}`;
 }
 
+/**
+ * Address for a login that exists before a mobile number is saved.
+ * The "p." prefix is neither a username nor a phone, so it cannot be used to sign in.
+ */
+export function loginEmailForPendingProfile(profileId: string): string {
+  return `p.${profileId}@${LOGIN_EMAIL_DOMAIN}`;
+}
+
 /** Username logins use the prefixed address. Everyone else still uses the mobile address. */
 export function loginEmailForProfile(profile: { username: string | null; mobile: string | null }): string | null {
   if (profile.username) return loginEmailForUsername(profile.username);

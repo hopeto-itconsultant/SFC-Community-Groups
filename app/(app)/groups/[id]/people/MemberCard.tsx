@@ -38,7 +38,7 @@ export function MemberCard({
         <div className="min-w-0">
           <p className="truncate font-bold">{shown(member.name)}</p>
           <p className="truncate text-sm text-slate-500">
-            {member.hasLogin ? `Signs in with ${member.mobile}` : "No login yet"}
+            {member.mobile ? `Signs in with ${member.mobile}` : "Add a mobile number to sign in"}
             {!member.active && " · Deactivated"}
           </p>
           <MemberDetails member={member} />
@@ -149,7 +149,7 @@ function DetailsForm({ member, onDone }: { member: GroupMember; onDone: () => vo
   return (
     <form action={action} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
       <MobileFields
-        required={member.hasLogin}
+        required={Boolean(member.mobile)}
         country={state.values?.country ?? stored.iso}
         mobile={state.values?.mobile ?? stored.national}
         aside="Without the country code."
