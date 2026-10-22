@@ -35,6 +35,7 @@ export default async function GuidePage() {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
         }
+        .guide a { color: #2e55a8; font-weight: 600; }
         .guide ul, .guide ol { margin: 0.25rem 0 0; padding-left: 1.15rem; }
         .guide li { margin: 0 0 0.2rem; }
       `}</style>

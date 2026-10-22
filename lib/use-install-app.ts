@@ -9,6 +9,9 @@ type BeforeInstallPromptEvent = Event & {
 
 export const INSTALL_CHANGE_EVENT = "pwa-install-change";
 
+/** iPhone install recording at public/guide/install-cg-sfc-ios-iphone.mp4. */
+export const IPHONE_INSTALL_VIDEO = "/guide/install-cg-sfc-ios-iphone.mp4";
+
 let deferred: BeforeInstallPromptEvent | null = null;
 let installedHere = false;
 let listening = false;

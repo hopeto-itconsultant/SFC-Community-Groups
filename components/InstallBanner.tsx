@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useSyncExternalStore } from "react";
-import { useInstallApp } from "@/lib/use-install-app";
+import { IPHONE_INSTALL_VIDEO, useInstallApp } from "@/lib/use-install-app";
 import { XIcon } from "./icons";
 
 // Kept in memory, not sessionStorage: mobile browsers restore sessionStorage with the tab,
@@ -50,7 +50,7 @@ export function InstallBanner({ className = "" }: { className?: string }) {
           {canInstall ? "Add to home screen" : "Share, then Add to Home Screen"}
         </span>
       </p>
-      {canInstall && (
+      {canInstall ? (
         <button
           type="button"
           onClick={install}
@@ -58,6 +58,15 @@ export function InstallBanner({ className = "" }: { className?: string }) {
         >
           Install
         </button>
+      ) : (
+        <a
+          href={IPHONE_INSTALL_VIDEO}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-xl bg-brand-700 px-3 py-2 text-sm font-semibold text-white shadow-sm active:scale-[0.98]"
+        >
+          Watch how
+        </a>
       )}
       <button
         type="button"
