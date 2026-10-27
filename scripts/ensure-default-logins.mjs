@@ -4,6 +4,7 @@
 //
 // Usage: npm run ensure-default-logins   (reads .env.local)
 import { createClient } from "@supabase/supabase-js";
+import { createConfirmedLogin } from "../lib/confirmed-login.ts";
 import { loginEmailForMobile, loginEmailForPendingProfile } from "../lib/login-id.ts";
 import { DEFAULT_PASSWORD } from "../lib/passwords.ts";
 
@@ -40,22 +41,18 @@ while (true) {
 
   for (const profile of profiles) {
     const email = profile.mobile ? loginEmailForMobile(profile.mobile) : loginEmailForPendingProfile(profile.id);
-    const { data: user, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password: DEFAULT_PASSWORD,
-      email_confirm: true,
-    });
-    if (authError || !user.user) {
-      failed.push(`${profile.name}: ${authError?.message ?? "no user was returned."}`);
+    const login = await createConfirmedLogin(supabase.auth.admin, email, DEFAULT_PASSWORD);
+    if ("error" in login) {
+      failed.push(`${profile.name}: ${login.error}`);
       continue;
     }
     const { error: linkError } = await supabase
       .from("profiles")
-      .update({ auth_user_id: user.user.id })
+      .update({ auth_user_id: login.id })
       .eq("id", profile.id)
       .is("auth_user_id", null);
     if (linkError) {
-      await supabase.auth.admin.deleteUser(user.user.id);
+      await supabase.auth.admin.deleteUser(login.id);
       failed.push(`${profile.name}: ${linkError.message}`);
       continue;
     }

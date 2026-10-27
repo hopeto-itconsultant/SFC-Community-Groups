@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -15,6 +16,7 @@ import {
   normalizeUsername,
 } from "@/lib/login-id";
 import { clearLoginAsProfileId, getLoginAsProfileId, setLoginAsProfileId } from "@/lib/login-as";
+import { confirmLogin, loginNeedsActivation, sweepOutstandingLogins } from "@/lib/confirmed-login";
 import { passwordProblem } from "@/lib/passwords";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearedRememberCookie, rememberCookie } from "@/lib/supabase/remember";
@@ -56,20 +58,33 @@ async function clearRememberPreference() {
  * The internal address for this sign-in text. Profiles are not readable before
  * login, so this uses the server secret key only to find the row.
  */
-async function resolveLoginEmail(typed: string): Promise<{ email: string | null; error?: string }> {
+async function resolveLoginEmail(
+  typed: string,
+): Promise<{ email: string | null; authUserId: string | null; error?: string }> {
   const asMobile = looksLikeMobile(typed);
   const value = asMobile ? normalizeMobile(typed) : normalizeUsername(typed);
-  if (!value) return { email: null };
+  if (!value) return { email: null, authUserId: null };
 
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("username, mobile")
+    .select("username, mobile, auth_user_id")
     .eq(asMobile ? "mobile" : "username", value)
     .maybeSingle();
-  if (error) return { email: null, error: error.message };
-  if (!data) return { email: null };
-  return { email: loginEmailForProfile(data) };
+  if (error) return { email: null, authUserId: null, error: error.message };
+  if (!data) return { email: null, authUserId: null };
+  return { email: loginEmailForProfile(data), authUserId: data.auth_user_id };
+}
+
+/**
+ * Confirms a login that was created while email confirmation was still required.
+ * Returns true when sign-in should be tried again. The password is left as it is.
+ */
+async function activateLogin(authUserId: string, email: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.getUserById(authUserId);
+  if (error || !data.user || !loginNeedsActivation(data.user, email)) return false;
+  return (await confirmLogin(admin.auth.admin, authUserId, email)) === null;
 }
 
 export async function signIn(_prev: SignInState, formData: FormData): Promise<SignInState> {
@@ -77,6 +92,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   const password = String(formData.get("password") ?? "");
   if (!typed) return signInFail("Enter your username or mobile number.", typed);
   if (!password) return signInFail("Enter your password.", typed);
+
+  after(() => sweepOutstandingLogins(createAdminClient().auth.admin));
 
   const resolved = await resolveLoginEmail(typed);
   if (resolved.error) return signInFail("Could not sign in. Try again.", typed);
@@ -88,10 +105,23 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   await clearLoginAsProfileId();
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
+  let { data, error } = await supabase.auth.signInWithPassword({
     email: resolved.email,
     password,
   });
+  // A login created under "Confirm email" can hold the right password and still
+  // be rejected until it is confirmed. Confirm it and try the same password again.
+  if ((error || !data.user) && resolved.authUserId) {
+    const activated = await activateLogin(resolved.authUserId, resolved.email);
+    if (activated) {
+      const retry = await supabase.auth.signInWithPassword({
+        email: resolved.email,
+        password,
+      });
+      data = retry.data;
+      error = retry.error;
+    }
+  }
   if (error || !data.user) {
     await clearRememberPreference();
     return signInFail(WRONG_LOGIN, typed);
