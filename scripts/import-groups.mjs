@@ -9,6 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { groups } from "../data/groups.ts";
 import { users } from "../data/users.ts";
+import { createConfirmedLogin } from "../lib/confirmed-login.ts";
 import { loginEmailForPendingProfile } from "../lib/login-id.ts";
 import { DEFAULT_PASSWORD } from "../lib/passwords.ts";
 
@@ -50,20 +51,20 @@ const profileIds = new Map();
 for (const u of leaders) {
   const { data, error } = await supabase.from("profiles").insert({ name: u.name }).select("id").single();
   if (error) fail(`Adding ${u.name}: ${error.message}`);
-  const { data: created, error: authError } = await supabase.auth.admin.createUser({
-    email: loginEmailForPendingProfile(data.id),
-    password: DEFAULT_PASSWORD,
-    email_confirm: true,
-  });
-  if (authError || !created.user) {
-    fail(`Creating the login for ${u.name}: ${authError?.message ?? "no user was returned."}`);
+  const created = await createConfirmedLogin(
+    supabase.auth.admin,
+    loginEmailForPendingProfile(data.id),
+    DEFAULT_PASSWORD,
+  );
+  if ("error" in created) {
+    fail(`Creating the login for ${u.name}: ${created.error}`);
   }
   const { error: linkError } = await supabase
     .from("profiles")
-    .update({ auth_user_id: created.user.id })
+    .update({ auth_user_id: created.id })
     .eq("id", data.id);
   if (linkError) {
-    await supabase.auth.admin.deleteUser(created.user.id);
+    await supabase.auth.admin.deleteUser(created.id);
     fail(`Linking the login for ${u.name}: ${linkError.message}`);
   }
   profileIds.set(u.id, data.id);

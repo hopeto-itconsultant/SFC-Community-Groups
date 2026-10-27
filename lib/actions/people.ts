@@ -15,6 +15,7 @@ import {
   loginEmailForUsername,
   normalizeUsername,
 } from "@/lib/login-id";
+import { createConfirmedLogin } from "@/lib/confirmed-login";
 import { DEFAULT_PASSWORD, passwordProblem } from "@/lib/passwords";
 import { isAdminRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -471,21 +472,14 @@ async function ensureDefaultLogin(
 ): Promise<string | null> {
   if (profile.auth_user_id) return null;
   const email = mobile ? loginEmailForMobile(mobile) : loginEmailForPendingProfile(profile.id);
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email,
-    password: DEFAULT_PASSWORD,
-    email_confirm: true,
-  });
-  if (error || !created.user) return `Could not create the login: ${error?.message ?? "no user was returned."}`;
-  const { error: linkError } = await admin
-    .from("profiles")
-    .update({ auth_user_id: created.user.id })
-    .eq("id", profile.id);
+  const created = await createConfirmedLogin(admin.auth.admin, email, DEFAULT_PASSWORD);
+  if ("error" in created) return `Could not create the login: ${created.error}`;
+  const { error: linkError } = await admin.from("profiles").update({ auth_user_id: created.id }).eq("id", profile.id);
   if (linkError) {
-    await admin.auth.admin.deleteUser(created.user.id);
+    await admin.auth.admin.deleteUser(created.id);
     return `Could not link the login: ${linkError.message}`;
   }
-  profile.auth_user_id = created.user.id;
+  profile.auth_user_id = created.id;
   return null;
 }
 
@@ -509,14 +503,14 @@ async function writeLogin(
     return null;
   }
 
-  const { data: created, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  if (error) return `Could not create the login: ${error.message}`;
+  const created = await createConfirmedLogin(admin.auth.admin, email, password);
+  if ("error" in created) return `Could not create the login: ${created.error}`;
   const { error: linkError } = await admin
     .from("profiles")
-    .update({ auth_user_id: created.user.id, mobile })
+    .update({ auth_user_id: created.id, mobile })
     .eq("id", profile.id);
   if (linkError) {
-    await admin.auth.admin.deleteUser(created.user.id);
+    await admin.auth.admin.deleteUser(created.id);
     return `Could not link the login: ${linkError.message}`;
   }
   return null;
@@ -559,7 +553,11 @@ export async function setLogin(profileId: string, _prev: LoginState, formData: F
       if (taken) return fail(taken);
     }
 
-    const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, { password });
+    const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, {
+      email: loginEmailForUsername(profile.username),
+      password,
+      email_confirm: true,
+    });
     if (error) return fail(`Could not update the login: ${error.message}`);
 
     let mobile = profile.mobile;
@@ -652,15 +650,11 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
     if (mobileTaken) return fail(mobileTaken);
   }
 
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email: loginEmailForUsername(username),
-    password,
-    email_confirm: true,
-  });
-  if (error || !created.user) return fail(`Could not create the login: ${error?.message ?? "no user was returned."}`);
+  const created = await createConfirmedLogin(admin.auth.admin, loginEmailForUsername(username), password);
+  if ("error" in created) return fail(`Could not create the login: ${created.error}`);
 
   const { error: profileError } = await admin.from("profiles").insert({
-    auth_user_id: created.user.id,
+    auth_user_id: created.id,
     name,
     username,
     mobile,
@@ -668,7 +662,7 @@ export async function createAdmin(_prev: CreateAdminState, formData: FormData): 
     is_superadmin: false,
   });
   if (profileError) {
-    await admin.auth.admin.deleteUser(created.user.id);
+    await admin.auth.admin.deleteUser(created.id);
     return fail(`Could not add the admin: ${profileError.message}`);
   }
 
@@ -878,7 +872,11 @@ export async function resetLeaderPassword(profileId: string): Promise<{ error?: 
   if (!profile.auth_user_id || !profile.mobile) return fail("This person does not have a login yet.");
 
   const password = DEFAULT_PASSWORD;
-  const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, { password });
+  const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, {
+    email: loginEmailForMobile(profile.mobile),
+    password,
+    email_confirm: true,
+  });
   if (error) return fail(`Could not reset the password: ${error.message}`);
 
   recordSuccess({

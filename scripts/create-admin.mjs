@@ -7,6 +7,7 @@
 import { createClient } from "@supabase/supabase-js";
 import readline from "node:readline/promises";
 import { Writable } from "node:stream";
+import { createConfirmedLogin } from "../lib/confirmed-login.ts";
 import { USERNAME_RULE, loginEmailForUsername, normalizeMobile, normalizeUsername } from "../lib/login-id.ts";
 import { MIN_PASSWORD_LENGTH, passwordProblem } from "../lib/passwords.ts";
 
@@ -89,18 +90,14 @@ if (mobile) {
   if (takenMobile) fail(`${mobile} is already used by ${takenMobile.name}.`);
 }
 
-const { data: created, error: createError } = await supabase.auth.admin.createUser({
-  email: loginEmailForUsername(username),
-  password,
-  email_confirm: true,
-});
-if (createError) fail(`Creating the login: ${createError.message}`);
+const created = await createConfirmedLogin(supabase.auth.admin, loginEmailForUsername(username), password);
+if ("error" in created) fail(`Creating the login: ${created.error}`);
 
 const { error: profileError } = await supabase
   .from("profiles")
-  .insert({ auth_user_id: created.user.id, name, username, mobile, is_admin: true, is_superadmin: false });
+  .insert({ auth_user_id: created.id, name, username, mobile, is_admin: true, is_superadmin: false });
 if (profileError) {
-  await supabase.auth.admin.deleteUser(created.user.id);
+  await supabase.auth.admin.deleteUser(created.id);
   fail(`Creating the profile (login removed again): ${profileError.message}`);
 }
 
