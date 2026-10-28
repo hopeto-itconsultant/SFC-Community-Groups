@@ -175,6 +175,14 @@ function unwrap<T>(what: string, { data, error }: { data: unknown; error: { mess
   return data as T;
 }
 
+function unwrapCount(
+  what: string,
+  { count, error }: { count: number | null; error: { message: string } | null },
+): number {
+  if (error) throw new Error(`Could not load ${what}: ${error.message}`);
+  return count ?? 0;
+}
+
 const loadGroups = cache(async (includeClosed: boolean): Promise<CommunityGroup[]> => {
   const supabase = await createClient();
   let query = supabase.from("groups").select(GROUP_COLUMNS);
@@ -190,32 +198,46 @@ export async function getGroups({ includeClosed = false }: { includeClosed?: boo
   return loadGroups(includeClosed);
 }
 
-export async function getClosedGroupCount(): Promise<number> {
-  return (await loadGroups(true)).filter((g) => g.status === "closed").length;
-}
+export const getClosedGroupCount = cache(async (): Promise<number> => {
+  const supabase = await createClient();
+  return unwrapCount(
+    "closed groups",
+    await supabase.from("groups").select("id", { count: "exact", head: true }).eq("status", "closed"),
+  );
+});
 
-/** Served from one cached list so screens can look up many groups per request with one query. */
-export async function getGroupById(id: string | undefined): Promise<CommunityGroup | undefined> {
+/** One group by id. Cached per request so the same group is not fetched twice. */
+export const getGroupById = cache(async (id: string | undefined): Promise<CommunityGroup | undefined> => {
   if (!isUuid(id)) return undefined;
-  return (await loadGroups(true)).find((g) => g.id === id);
-}
+  const supabase = await createClient();
+  const row = unwrap<GroupRow | null>(
+    "group",
+    await supabase.from("groups").select(GROUP_COLUMNS).eq("id", id).maybeSingle(),
+  );
+  return row ? toGroup(row) : undefined;
+});
 
-/** Everyone the signed-in user may see, by name; cached so name lookups share one query per request. */
+/** Everyone the signed-in user may see, by name; cached so list screens share one query per request. */
 export const getUsers = cache(async (): Promise<User[]> => {
   const supabase = await createClient();
   const rows = unwrap<ProfileRow[]>("people", await supabase.from("profiles").select(PROFILE_COLUMNS).order("name"));
   return rows.map(toUser);
 });
 
-export async function getUserById(id: string | undefined): Promise<User | undefined> {
+export const getUserById = cache(async (id: string | undefined): Promise<User | undefined> => {
   if (!isUuid(id)) return undefined;
-  return (await getUsers()).find((u) => u.id === id);
-}
+  const supabase = await createClient();
+  const row = unwrap<ProfileRow | null>(
+    "person",
+    await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle(),
+  );
+  return row ? toUser(row) : undefined;
+});
 
 async function getUsersInOrder(ids: string[]): Promise<User[]> {
   if (!ids.length) return [];
-  const users = await getUsers();
-  return ids.map((id) => users.find((u) => u.id === id)).filter((u): u is User => !!u);
+  const users = await Promise.all(ids.map((id) => getUserById(id)));
+  return users.filter((u): u is User => !!u);
 }
 
 export async function getGroupLeaders(group: CommunityGroup): Promise<User[]> {
@@ -292,27 +314,26 @@ export const getLastFellowship = cache(async (groupId: string): Promise<Fellowsh
   return row ? (toReport(row) as FellowshipReport) : undefined;
 });
 
-/** All upcoming plans the user may see, soonest first; one query shared by every group on a screen. */
-const loadUpcomingFellowships = cache(async (): Promise<NextFellowship[]> => {
+/** Upcoming plans the user may see, soonest first. Pass a group id to skip every other group. */
+const loadUpcomingFellowships = cache(async (groupId: string | null): Promise<NextFellowship[]> => {
   const supabase = await createClient();
+  let query = supabase
+    .from("reports")
+    .select(REPORT_COLUMNS)
+    .eq("type", "next-fellowship")
+    .is("cancelled_at", null)
+    .gte("report_date", startOfDayTimestamp(todayISO()));
+  if (groupId) query = query.eq("group_id", idFilter(groupId));
   const rows = unwrap<ReportRow[]>(
     "upcoming fellowships",
-    await supabase
-      .from("reports")
-      .select(REPORT_COLUMNS)
-      .eq("type", "next-fellowship")
-      .is("cancelled_at", null)
-      .gte("report_date", startOfDayTimestamp(todayISO()))
-      .order("report_date", { ascending: true })
-      .order("created_at", { ascending: true }),
+    await query.order("report_date", { ascending: true }).order("created_at", { ascending: true }),
   );
   return rows.map(toReport) as NextFellowship[];
 });
 
 /** Upcoming planned fellowships (today or later), soonest first. */
 export async function getUpcomingFellowships(groupId?: string): Promise<NextFellowship[]> {
-  const all = await loadUpcomingFellowships();
-  return groupId ? all.filter((r) => r.groupId === groupId) : all;
+  return loadUpcomingFellowships(groupId ?? null);
 }
 
 export async function getNextFellowship(groupId: string): Promise<NextFellowship | undefined> {
@@ -375,10 +396,18 @@ export const isLatestFiledReport = cache(async (report: FellowshipReport | Follo
   return row?.id === report.id;
 });
 
-/** Reports filed during the current calendar month. */
-export async function getReportsFiledThisMonth(groupId?: string): Promise<Report[]> {
-  return getReports({ groupId, period: "this-month" });
-}
+/** How many reports were filed during the current calendar month. */
+export const getReportsFiledThisMonthCount = cache(async (groupId?: string): Promise<number> => {
+  const supabase = await createClient();
+  const today = todayISO();
+  let query = supabase
+    .from("reports")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
+    .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
+  if (groupId) query = query.eq("group_id", idFilter(groupId));
+  return unwrapCount("reports this month", await query);
+});
 
 /** Per-type headline numbers for the Reports overview, computed by `public.report_type_summaries`. */
 export const getReportTypeSummaries = cache(async (groupId?: string): Promise<ReportTypeSummaries> => {

@@ -8,6 +8,12 @@ export interface ReportsParams {
   expenses?: boolean;
 }
 
+export interface ReportsScope {
+  isAdmin: boolean;
+  groupId?: string;
+  subtitle: string | undefined;
+}
+
 export function reportsHref(params: ReportsParams): string {
   const query = new URLSearchParams();
   if (params.expenses) query.set("view", "expenses");

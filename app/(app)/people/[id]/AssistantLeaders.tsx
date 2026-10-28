@@ -1,15 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { Field, inputClass } from "@/components/form";
-import { LeaderDetailFields } from "@/components/LeaderDetailFields";
-import { MobileFields } from "@/components/MobileFields";
+import dynamic from "next/dynamic";
+import { useState } from "react";
 import { Badge, Button, Card, SectionTitle } from "@/components/ui";
-import { updateMemberDetails, type MemberDetailsState } from "@/lib/actions/people";
-import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
 import type { AssistantLeader } from "@/lib/data-access";
 import { formatDate } from "@/lib/format";
 import { useDisplayName } from "@/lib/session";
+
+const AssistantDetailsForm = dynamic(() =>
+  import("./AssistantDetailsForm").then((m) => m.AssistantDetailsForm),
+);
 
 export function AssistantLeaders({
   assistants,
@@ -54,7 +54,7 @@ function AssistantCard({ assistant, showGroups }: { assistant: AssistantLeader; 
       {!assistant.active && <p className="mt-1 text-sm font-medium text-slate-500">This login is deactivated.</p>}
 
       {editing ? (
-        <DetailsForm assistant={assistant} onDone={() => setEditing(false)} />
+        <AssistantDetailsForm assistant={assistant} onDone={() => setEditing(false)} />
       ) : (
         <>
           <dl className="mt-2 space-y-0.5 text-sm text-slate-600">
@@ -80,58 +80,5 @@ function DetailLine({ label, value, breakAll }: { label: string; value?: string;
         {value ?? "Not entered"}
       </dd>
     </div>
-  );
-}
-
-function DetailsForm({ assistant, onDone }: { assistant: AssistantLeader; onDone: () => void }) {
-  const [state, action, pending] = useActionState<MemberDetailsState, FormData>(
-    updateMemberDetails.bind(null, assistant.id),
-    {},
-  );
-
-  useEffect(() => {
-    if (state.saved) onDone();
-  }, [state.saved, onDone]);
-
-  const stored = assistant.mobile ? splitMobile(assistant.mobile) : { iso: DEFAULT_COUNTRY_ISO, national: "" };
-
-  return (
-    <form action={action} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-      <Field label="Name" required>
-        <input
-          name="name"
-          type="text"
-          required
-          defaultValue={state.values?.name ?? assistant.name}
-          autoComplete="off"
-          autoCapitalize="words"
-          className={inputClass}
-        />
-      </Field>
-      <MobileFields
-        required={Boolean(assistant.mobile)}
-        country={state.values?.country ?? stored.iso}
-        mobile={state.values?.mobile ?? stored.national}
-        aside="Without the country code."
-      />
-      <LeaderDetailFields
-        dateOfBirth={state.values?.dateOfBirth ?? assistant.dateOfBirth}
-        email={state.values?.email ?? assistant.email}
-        servingSince={state.values?.servingSince ?? assistant.servingSince}
-      />
-      {state.error && (
-        <p role="alert" className="text-sm font-medium text-red-600">
-          {state.error}
-        </p>
-      )}
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" onClick={onDone}>
-          Back
-        </Button>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save details"}
-        </Button>
-      </div>
-    </form>
   );
 }

@@ -1,9 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/data/types";
-import { BottomNav, SideNav } from "./MainNav";
-import { LoginAsBanner } from "./LoginAsBanner";
+import { BottomNav } from "./MainNav";
+
+const SideNav = dynamic(() => import("./SideNav").then((m) => m.SideNav));
+const LoginAsBanner = dynamic(() => import("./LoginAsBanner").then((m) => m.LoginAsBanner));
 
 const COMPACT_SHELL =
   "mx-auto flex min-h-dvh w-full max-w-xl flex-col bg-slate-100 sm:shadow-xl sm:shadow-slate-300/40";

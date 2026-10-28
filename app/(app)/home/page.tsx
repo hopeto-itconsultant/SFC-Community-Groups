@@ -1,126 +1,31 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { CommunityGroup, CurrentUser } from "@/data/types";
-import { GroupMiniCard, GroupSummaryRow, StatCard } from "@/components/groups";
+import type { CommunityGroup, CurrentUser, FellowshipReport, NextFellowship } from "@/data/types";
 import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, FileTextIcon } from "@/components/icons";
 import { InstallBanner } from "@/components/InstallBanner";
-import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { ViewSwitch } from "@/components/ViewToggle";
-import { getNameDisplay, requireUser } from "@/lib/auth";
+import { Badge, Card, EmptyState, SectionTitle } from "@/components/ui";
+import { StatCard } from "@/components/StatCard";
+import { requireUser } from "@/lib/auth";
 import {
   getGroupById,
-  getGroups,
   getLastFellowship,
   getNextFellowship,
   getReportTypeSummaries,
-  getReportsFiledThisMonth,
-  getUpcomingFellowships,
+  getReportsFiledThisMonthCount,
 } from "@/lib/data-access";
-import { APP_NAME, LOGO_SRC } from "@/lib/brand";
-import { ROLE_LABELS, formatRupees, formatShortDateTimeDay } from "@/lib/format";
+import { formatRupees, formatShortDateTimeDay } from "@/lib/format";
 import { isAdminRole } from "@/lib/roles";
+import { Hero } from "./Hero";
 
 export default async function HomePage() {
   const user = await requireUser();
-  if (isAdminRole(user.role)) return <AdminHome user={user} />;
+  if (isAdminRole(user.role)) {
+    const { AdminHome } = await import("./AdminHome");
+    return <AdminHome user={user} />;
+  }
   const group = await getGroupById(user.groupId);
   if (!group) return <NoGroupHome user={user} />;
   return <LeaderHome user={user} group={group} />;
-}
-
-async function Hero({ user, subtitle }: { user: CurrentUser; subtitle?: string }) {
-  const welcomeName = (await getNameDisplay())(user.name);
-  return (
-    <div className="bg-brand-700 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-100">
-          <Image
-            src={LOGO_SRC}
-            alt=""
-            width={24}
-            height={24}
-            unoptimized
-            className="shrink-0 rounded-md ring-1 ring-white/30"
-          />
-          <span className="truncate">{APP_NAME}</span>
-        </div>
-        <h1 className="shrink-0 text-xs text-brand-100">
-          Welcome <span className="italic">{welcomeName}</span>
-        </h1>
-      </div>
-      {subtitle && (
-        <div className="mt-1 flex items-center gap-2">
-          <span className="truncate font-semibold">{subtitle}</span>
-          <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold">
-            {ROLE_LABELS[user.role]}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-async function AdminHome({ user }: { user: CurrentUser }) {
-  const [groups, filedThisMonth, upcoming] = await Promise.all([
-    getGroups(),
-    getReportsFiledThisMonth(),
-    getUpcomingFellowships(),
-  ]);
-
-  return (
-    <>
-      <Hero user={user} />
-      <div className="-mt-3 px-4">
-        <div className="grid grid-cols-3 gap-2">
-          <StatCard label="Groups" value={groups.length} href="/groups" />
-          <StatCard
-            label="Reports this month"
-            value={filedThisMonth.length}
-            href="/reports?period=this-month"
-          />
-          <StatCard
-            label="Planned fellowships"
-            value={upcoming.length}
-            href="/reports?type=next-fellowship&period=upcoming"
-          />
-        </div>
-        <InstallBanner className="mt-3" />
-
-        {groups.length ? (
-          <ViewSwitch
-            storageKey="sfc.homeGroupView"
-            title="CG Status"
-            placement="section"
-            sectionClassName="mb-1.5 mt-3"
-            cards={
-              <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @lg:grid-cols-4">
-                {groups.map((g) => (
-                  <GroupMiniCard key={g.id} group={g} />
-                ))}
-              </div>
-            }
-            list={
-              <Card className="divide-y divide-slate-100 overflow-hidden p-0">
-                {groups.map((g) => (
-                  <GroupSummaryRow key={g.id} group={g} />
-                ))}
-              </Card>
-            }
-          />
-        ) : (
-          <>
-            <SectionTitle>CG Status</SectionTitle>
-            <EmptyState
-              title="No groups yet"
-              description="Add the first community group to get started."
-              action={<LinkButton href="/groups/new">Add group</LinkButton>}
-            />
-          </>
-        )}
-      </div>
-    </>
-  );
 }
 
 function NoGroupHome({ user }: { user: CurrentUser }) {
@@ -188,9 +93,13 @@ function StatusRow({
   );
 }
 
-async function LeaderStatusCard({ groupId }: { groupId: string }) {
-  const [next, last] = await Promise.all([getNextFellowship(groupId), getLastFellowship(groupId)]);
-
+function LeaderStatusCard({
+  next,
+  last,
+}: {
+  next: NextFellowship | undefined;
+  last: FellowshipReport | undefined;
+}) {
   return (
     <Card className="divide-y divide-slate-100 overflow-hidden p-0">
       {next ? (
@@ -231,10 +140,11 @@ async function LeaderStatusCard({ groupId }: { groupId: string }) {
 }
 
 async function LeaderHome({ user, group }: { user: CurrentUser; group: CommunityGroup }) {
-  const [summaries, filedThisMonth, upcoming] = await Promise.all([
+  const [summaries, filedThisMonth, next, last] = await Promise.all([
     getReportTypeSummaries(group.id),
-    getReportsFiledThisMonth(group.id),
-    getUpcomingFellowships(group.id),
+    getReportsFiledThisMonthCount(group.id),
+    getNextFellowship(group.id),
+    getLastFellowship(group.id),
   ]);
 
   return (
@@ -244,12 +154,12 @@ async function LeaderHome({ user, group }: { user: CurrentUser; group: Community
         <div className="grid grid-cols-3 gap-2">
           <StatCard
             label="Reports this month"
-            value={filedThisMonth.length}
+            value={filedThisMonth}
             href="/reports?period=this-month"
           />
           <StatCard
             label="Planned fellowships"
-            value={upcoming.length}
+            value={summaries.nextFellowship.upcomingCount}
             href="/reports?type=next-fellowship&period=upcoming"
           />
           <StatCard
@@ -281,7 +191,7 @@ async function LeaderHome({ user, group }: { user: CurrentUser; group: Community
         </div>
 
         <SectionTitle>CG Status</SectionTitle>
-        <LeaderStatusCard groupId={group.id} />
+        <LeaderStatusCard next={next} last={last} />
       </div>
     </>
   );

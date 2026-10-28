@@ -1,6 +1,6 @@
 import { GroupProfile } from "@/components/groups";
 import { PageHeader } from "@/components/PageHeader";
-import { NextFellowshipSummary } from "@/components/reports";
+import { NextFellowshipSummary } from "@/components/report-cards";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
 import { SavedBanner } from "@/components/SavedBanner";
 import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";

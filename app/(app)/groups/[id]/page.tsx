@@ -1,7 +1,8 @@
 import type { Report } from "@/data/types";
 import { GroupProfile } from "@/components/groups";
 import { PageHeader } from "@/components/PageHeader";
-import { NextFellowshipSummary, ReportCard } from "@/components/reports";
+import { NextFellowshipSummary } from "@/components/report-cards";
+import { ReportCard } from "@/components/reports";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
 import { SavedBanner } from "@/components/SavedBanner";
 import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
