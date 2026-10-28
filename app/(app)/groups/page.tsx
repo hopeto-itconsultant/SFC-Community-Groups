@@ -28,7 +28,7 @@ async function GroupsList({ showClosed }: { showClosed: boolean }) {
         subtitle={`${groups.length} groups`}
         placement="page"
         cards={
-          <div className="grid grid-cols-2 gap-3 p-4">
+          <div className="grid grid-cols-2 gap-3 p-4 @md:grid-cols-3 @lg:grid-cols-4">
             {groups.map((g) => (
               <GroupDetailCard key={g.id} group={g} />
             ))}

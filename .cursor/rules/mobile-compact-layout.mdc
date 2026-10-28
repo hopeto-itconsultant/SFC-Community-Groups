@@ -7,6 +7,8 @@ alwaysApply: true
 
 Screens are used on a phone. Extra headings make people scroll. One header is enough.
 
+Superadmin on a desktop (`md` and up) may use a sidebar and extra columns. Compact rules still apply on phones and for every other role. Do not add `FormSection` titles or a subtitle line under the page title.
+
 ## Page header
 
 - Use a single header line (`PageHeader` title only).

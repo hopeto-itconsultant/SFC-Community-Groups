@@ -29,10 +29,12 @@ export default async function ActivityPage() {
   return (
     <>
       <PageHeader title="Activity log" backHref="/settings" />
-      <div className="space-y-1 p-4 pb-6">
+      <div className="space-y-1 p-4 pb-6 @md:grid @md:grid-cols-2 @md:items-start @md:gap-4 @md:space-y-0">
         <UsageSection usage={usage} />
-        <ErrorsSection errors={errors} showSalutations={real.showSalutations} />
-        <RecentSection rows={recent} showSalutations={real.showSalutations} />
+        <div className="space-y-1">
+          <ErrorsSection errors={errors} showSalutations={real.showSalutations} />
+          <RecentSection rows={recent} showSalutations={real.showSalutations} />
+        </div>
       </div>
     </>
   );
