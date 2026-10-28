@@ -4,10 +4,12 @@ import { ReportDetail } from "@/components/reports";
 import { NotAvailable } from "@/components/RoleGate";
 import { SavedBanner } from "@/components/SavedBanner";
 import { LinkButton } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { getRealUser, requireUser } from "@/lib/auth";
 import { getGroupById, getReportById, isLatestFiledReport } from "@/lib/data-access";
 import { REPORT_TYPE_LABELS } from "@/lib/format";
 import { canEditFiledReport, canEditPlan } from "@/lib/report-rules";
+import { isSuperAdmin } from "@/lib/roles";
+import { DeleteReportButton } from "./DeleteReportButton";
 import { PlanActions } from "./PlanActions";
 
 const NEW_REPORT: Record<ReportType, { title: string; another: string }> = {
@@ -23,7 +25,12 @@ const UPDATED_REPORT: Record<ReportType, string> = {
 };
 
 export default async function ReportDetailPage({ params, searchParams }: PageProps<"/reports/[id]">) {
-  const [{ id }, { saved }, user] = await Promise.all([params, searchParams, requireUser()]);
+  const [{ id }, { saved }, user, real] = await Promise.all([
+    params,
+    searchParams,
+    requireUser(),
+    getRealUser(),
+  ]);
   const report = await getReportById(id);
   if (!report) return <NotAvailable message="This report could not be found." />;
   const group = await getGroupById(report.groupId);
@@ -31,6 +38,7 @@ export default async function ReportDetailPage({ params, searchParams }: PagePro
     !!group &&
     (report.type === "fellowship" || report.type === "follow-up") &&
     canEditFiledReport(user, report, group, await isLatestFiledReport(report));
+  const canDelete = !!real && isSuperAdmin(real.role);
 
   const banner =
     saved === "new"
@@ -69,6 +77,7 @@ export default async function ReportDetailPage({ params, searchParams }: PagePro
             </LinkButton>
           </div>
         )}
+        {canDelete && <DeleteReportButton reportId={report.id} reportType={report.type} />}
       </div>
     </>
   );
