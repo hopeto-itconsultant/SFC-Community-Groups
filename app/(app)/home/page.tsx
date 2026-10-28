@@ -7,7 +7,7 @@ import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, FileTextIcon } from "
 import { InstallBanner } from "@/components/InstallBanner";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
 import { ViewSwitch } from "@/components/ViewToggle";
-import { requireUser } from "@/lib/auth";
+import { getNameDisplay, requireUser } from "@/lib/auth";
 import {
   getGroupById,
   getGroups,
@@ -18,7 +18,7 @@ import {
   getUpcomingFellowships,
 } from "@/lib/data-access";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
-import { ROLE_LABELS, displayName, formatRupees, formatShortDateTimeDay } from "@/lib/format";
+import { ROLE_LABELS, formatRupees, formatShortDateTimeDay } from "@/lib/format";
 import { isAdminRole } from "@/lib/roles";
 
 export default async function HomePage() {
@@ -29,7 +29,8 @@ export default async function HomePage() {
   return <LeaderHome user={user} group={group} />;
 }
 
-function Hero({ user, subtitle }: { user: CurrentUser; subtitle?: string }) {
+async function Hero({ user, subtitle }: { user: CurrentUser; subtitle?: string }) {
+  const welcomeName = (await getNameDisplay())(user.name);
   return (
     <div className="bg-brand-700 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-white">
       <div className="flex items-center justify-between gap-3">
@@ -45,7 +46,7 @@ function Hero({ user, subtitle }: { user: CurrentUser; subtitle?: string }) {
           <span className="truncate">{APP_NAME}</span>
         </div>
         <h1 className="shrink-0 text-xs text-brand-100">
-          Welcome <span className="italic">{displayName(user.name, user.showSalutations)}</span>
+          Welcome <span className="italic">{welcomeName}</span>
         </h1>
       </div>
       {subtitle && (

@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          hidden_salutations: string
+          id: number
+        }
+        Insert: {
+          hidden_salutations: string
+          id?: number
+        }
+        Update: {
+          hidden_salutations?: string
+          id?: number
+        }
+        Relationships: []
+      }
       activity_log: {
         Row: {
           acting_as_id: string | null
@@ -332,6 +347,7 @@ export type Database = {
       is_group_member: { Args: { group_id: string }; Returns: boolean }
       report_is_latest: { Args: { p_report_id: string }; Returns: boolean }
       report_type_summaries: { Args: { p_group_id?: string }; Returns: Json }
+      set_hidden_salutations: { Args: { list: string }; Returns: undefined }
       set_show_salutations: { Args: { show: boolean }; Returns: undefined }
       storage_group_id: { Args: { object_name: string }; Returns: string }
     }

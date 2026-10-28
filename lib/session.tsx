@@ -7,6 +7,7 @@ import { displayName } from "@/lib/format";
 interface SessionValue {
   user: CurrentUser;
   group: CommunityGroup | undefined;
+  hiddenSalutations: readonly string[];
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -15,9 +16,12 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({
   user,
   group,
+  hiddenSalutations,
   children,
 }: SessionValue & { children: React.ReactNode }) {
-  return <SessionContext.Provider value={{ user, group }}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={{ user, group, hiddenSalutations }}>{children}</SessionContext.Provider>
+  );
 }
 
 /** For Client Components inside the signed-in area, where the layout guarantees a user. */
@@ -29,6 +33,6 @@ export function useCurrentUser(): SessionValue {
 
 /** Formats names for the signed-in person's screens, following their salutation choice. */
 export function useDisplayName(): (name: string) => string {
-  const { user } = useCurrentUser();
-  return (name) => displayName(name, user.showSalutations);
+  const { user, hiddenSalutations } = useCurrentUser();
+  return (name) => displayName(name, user.showSalutations, hiddenSalutations);
 }

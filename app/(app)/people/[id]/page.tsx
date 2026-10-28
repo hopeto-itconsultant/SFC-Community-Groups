@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/PageHeader";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
-import { requireUser } from "@/lib/auth";
+import { getNameDisplay, requireUser } from "@/lib/auth";
 import { getAssistantLeaders, getLeaderProfile } from "@/lib/data-access";
-import { ROLE_LABELS, displayName } from "@/lib/format";
+import { ROLE_LABELS } from "@/lib/format";
 import { isAdminRole } from "@/lib/roles";
 import { AssistantLeaders } from "./AssistantLeaders";
 import { LeaderDetailsForm } from "./LeaderDetailsForm";
@@ -36,11 +36,12 @@ async function LeaderDetails({ id }: { id: string }) {
   const groups = leader.groups
     .map((group) => `${group.name} · ${ROLE_LABELS[group.role]}${group.status === "closed" ? " · Closed" : ""}`)
     .join(", ");
+  const shown = await getNameDisplay();
 
   return (
     <>
       <PageHeader
-        title={displayName(leader.name, user.showSalutations)}
+        title={shown(leader.name)}
         subtitle={groups || "No group"}
         backHref={asAdmin ? "/people" : "/settings"}
       />

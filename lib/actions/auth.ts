@@ -20,6 +20,7 @@ import { confirmLogin, loginNeedsActivation, sweepOutstandingLogins } from "@/li
 import { passwordProblem } from "@/lib/passwords";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearedRememberCookie, rememberCookie } from "@/lib/supabase/remember";
+import { formatHiddenSalutations, normalizeHiddenSalutations } from "@/lib/salutations";
 import { createClient } from "@/lib/supabase/server";
 
 export interface SignInState {
@@ -247,6 +248,23 @@ export async function returnToAdmin(): Promise<void> {
   await clearLoginAsProfileId();
   revalidatePath("/", "layout");
   redirect("/people");
+}
+
+/** Saves the shared comma-separated list of titles to hide. Superadmin only. */
+export async function setHiddenSalutations(input: string): Promise<{ error?: string; value?: string }> {
+  const real = await getRealUser();
+  if (!real || !isSuperAdmin(real.role)) return { error: "Only a superadmin can change this." };
+  if (await getLoginAsProfileId()) return { error: "Back to admin before changing this setting." };
+
+  const normalized = normalizeHiddenSalutations(input);
+  if (normalized.error) return { error: normalized.error };
+  const value = formatHiddenSalutations(normalized.list);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_hidden_salutations", { list: value });
+  if (error) return { error: "Could not save. Try again." };
+  revalidatePath("/", "layout");
+  return { value };
 }
 
 /** Saves whether titles such as "Bro." show before names on the signed-in person's own screens. */

@@ -3,19 +3,25 @@ import { ChevronRightIcon, LogOutIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, Button, Card, InfoRow, SectionTitle } from "@/components/ui";
 import { signOut } from "@/lib/actions/auth";
-import { getRealUser, requireUser } from "@/lib/auth";
+import { getNameDisplay, getRealUser, requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
 import { getGroupById } from "@/lib/data-access";
-import { ROLE_LABELS, displayName } from "@/lib/format";
+import { ROLE_LABELS } from "@/lib/format";
+import { getHiddenSalutationsSetting } from "@/lib/hidden-salutations";
 import { isAdminRole, isSuperAdmin } from "@/lib/roles";
+import { HiddenSalutationsForm } from "./HiddenSalutationsForm";
 import { InstallAppLink } from "./InstallAppLink";
 import { SalutationToggle } from "./SalutationToggle";
 
 export default async function SettingsPage() {
   const [user, real] = await Promise.all([requireUser(), getRealUser()]);
-  const group = await getGroupById(user.groupId);
   const showAdminBlock = isAdminRole(user.role);
   const showActivity = !!real && isSuperAdmin(real.role) && isAdminRole(user.role);
+  const [group, shown, hiddenTitles] = await Promise.all([
+    getGroupById(user.groupId),
+    getNameDisplay(),
+    showActivity ? getHiddenSalutationsSetting() : Promise.resolve(null),
+  ]);
 
   return (
     <>
@@ -61,7 +67,7 @@ export default async function SettingsPage() {
         <SectionTitle>Signed in as</SectionTitle>
         <Card>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-lg font-bold">{displayName(user.name, user.showSalutations)}</p>
+            <p className="text-lg font-bold">{shown(user.name)}</p>
             <Badge>{ROLE_LABELS[user.role]}</Badge>
           </div>
           <dl className="mt-2 divide-y divide-slate-100">
@@ -69,6 +75,8 @@ export default async function SettingsPage() {
           </dl>
           <SalutationToggle initial={user.showSalutations} />
         </Card>
+
+        {hiddenTitles && <HiddenSalutationsForm initial={hiddenTitles.text} />}
 
         <div className="mt-3 space-y-2">
           {user.role === "leader" && (

@@ -11,6 +11,7 @@ import {
 } from "@/lib/activity-log";
 import { getRealUser } from "@/lib/auth";
 import { ROLE_LABELS, displayName } from "@/lib/format";
+import { getHiddenSalutations } from "@/lib/hidden-salutations";
 import { isSuperAdmin } from "@/lib/roles";
 import type { Role } from "@/data/types";
 
@@ -20,10 +21,11 @@ export default async function ActivityPage() {
     return <NotAvailable message="Only a superadmin can view the activity log." />;
   }
 
-  const [usage, errors, recent] = await Promise.all([
+  const [usage, errors, recent, salutations] = await Promise.all([
     getActivityUsage(7),
     getRecentActivityErrors(20),
     getRecentActivity(100),
+    getHiddenSalutations(),
   ]);
 
   return (
@@ -31,8 +33,8 @@ export default async function ActivityPage() {
       <PageHeader title="Activity log" backHref="/settings" />
       <div className="space-y-1 p-4 pb-6">
         <UsageSection usage={usage} />
-        <ErrorsSection errors={errors} showSalutations={real.showSalutations} />
-        <RecentSection rows={recent} showSalutations={real.showSalutations} />
+        <ErrorsSection errors={errors} showSalutations={real.showSalutations} salutations={salutations} />
+        <RecentSection rows={recent} showSalutations={real.showSalutations} salutations={salutations} />
       </div>
     </>
   );
@@ -88,7 +90,15 @@ function UsageSection({ usage }: { usage: ActivityUsageCount[] }) {
   );
 }
 
-function ErrorsSection({ errors, showSalutations }: { errors: ActivityRow[]; showSalutations: boolean }) {
+function ErrorsSection({
+  errors,
+  showSalutations,
+  salutations,
+}: {
+  errors: ActivityRow[];
+  showSalutations: boolean;
+  salutations: readonly string[];
+}) {
   return (
     <>
       <SectionTitle>Recent errors</SectionTitle>
@@ -97,7 +107,13 @@ function ErrorsSection({ errors, showSalutations }: { errors: ActivityRow[]; sho
       ) : (
         <div className="space-y-2">
           {errors.map((row) => (
-            <ActivityCard key={row.id} row={row} showSalutations={showSalutations} emphasizeError />
+            <ActivityCard
+              key={row.id}
+              row={row}
+              showSalutations={showSalutations}
+              salutations={salutations}
+              emphasizeError
+            />
           ))}
         </div>
       )}
@@ -105,7 +121,15 @@ function ErrorsSection({ errors, showSalutations }: { errors: ActivityRow[]; sho
   );
 }
 
-function RecentSection({ rows, showSalutations }: { rows: ActivityRow[]; showSalutations: boolean }) {
+function RecentSection({
+  rows,
+  showSalutations,
+  salutations,
+}: {
+  rows: ActivityRow[];
+  showSalutations: boolean;
+  salutations: readonly string[];
+}) {
   return (
     <>
       <SectionTitle>Recent activity</SectionTitle>
@@ -114,7 +138,7 @@ function RecentSection({ rows, showSalutations }: { rows: ActivityRow[]; showSal
       ) : (
         <div className="space-y-2">
           {rows.map((row) => (
-            <ActivityCard key={row.id} row={row} showSalutations={showSalutations} />
+            <ActivityCard key={row.id} row={row} showSalutations={showSalutations} salutations={salutations} />
           ))}
         </div>
       )}
@@ -125,13 +149,15 @@ function RecentSection({ rows, showSalutations }: { rows: ActivityRow[]; showSal
 function ActivityCard({
   row,
   showSalutations,
+  salutations,
   emphasizeError,
 }: {
   row: ActivityRow;
   showSalutations: boolean;
+  salutations: readonly string[];
   emphasizeError?: boolean;
 }) {
-  const who = actorLine(row, showSalutations);
+  const who = actorLine(row, showSalutations, salutations);
   return (
     <Card className={row.outcome === "error" || emphasizeError ? "ring-red-200/80" : ""}>
       <div className="flex items-start justify-between gap-2">
@@ -151,12 +177,12 @@ function ActivityCard({
   );
 }
 
-function actorLine(row: ActivityRow, showSalutations: boolean): string | null {
+function actorLine(row: ActivityRow, showSalutations: boolean, salutations: readonly string[]): string | null {
   if (!row.actorName && !row.actingAsName) return null;
-  const actor = row.actorName ? displayName(row.actorName, showSalutations) : "Someone";
+  const actor = row.actorName ? displayName(row.actorName, showSalutations, salutations) : "Someone";
   const role = row.actorRole ? ` (${roleLabel(row.actorRole)})` : "";
   if (row.actingAsName) {
-    return `${actor}${role} as ${displayName(row.actingAsName, showSalutations)}`;
+    return `${actor}${role} as ${displayName(row.actingAsName, showSalutations, salutations)}`;
   }
   return `${actor}${role}`;
 }

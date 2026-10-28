@@ -5,6 +5,7 @@ import type { CurrentUser, Role } from "@/data/types";
 import { SHOW_NAME_SALUTATIONS } from "@/lib/config";
 import { isUuid } from "@/lib/data-access";
 import { displayName } from "@/lib/format";
+import { getHiddenSalutations } from "@/lib/hidden-salutations";
 import { clearLoginAsProfileId, getLoginAsProfileId } from "@/lib/login-as";
 import { isAdminRole, isSuperAdmin } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -152,6 +153,7 @@ export async function requireSuperAdmin(): Promise<CurrentUser> {
 
 /** Formats names for the signed-in person's screens, following their salutation choice. */
 export async function getNameDisplay(): Promise<(name: string) => string> {
-  const show = (await getCurrentUser())?.showSalutations ?? SHOW_NAME_SALUTATIONS;
-  return (name) => displayName(name, show);
+  const [user, salutations] = await Promise.all([getCurrentUser(), getHiddenSalutations()]);
+  const show = user?.showSalutations ?? SHOW_NAME_SALUTATIONS;
+  return (name) => displayName(name, show, salutations);
 }

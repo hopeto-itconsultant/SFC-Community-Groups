@@ -231,13 +231,7 @@ export const REPORT_TYPE_EMOJI: Record<ReportType, string> = {
   "next-fellowship": "📅",
 };
 
-const SALUTATION = /^(?:(?:bro|sis|dr|mr|mrs|ms|miss|pr|ps|rev|pastor|elder)\.?\s+)+/i;
-
-/** Name as shown on screen; drops a leading title unless `show` is on. */
-export function displayName(name: string, show: boolean): string {
-  if (show) return name;
-  return name.replace(SALUTATION, "") || name;
-}
+export { displayName } from "@/lib/salutations";
 
 export const NOT_ASSIGNED = "Not assigned";
 export const NOT_AVAILABLE = "Not available";

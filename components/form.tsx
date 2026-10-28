@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { CommunityGroup, CurrentUser, Role } from "@/data/types";
-import { ROLE_LABELS, displayName, formatDate, todayISO } from "@/lib/format";
+import { ShownName } from "@/components/ShownName";
+import { ROLE_LABELS, formatDate, todayISO } from "@/lib/format";
 import { Badge, Button, Card } from "./ui";
 
 export const LEADER_ROLES: Exclude<Role, "admin" | "superadmin">[] = ["leader", "asst-leader"];
@@ -169,7 +170,7 @@ export function FiledBy({
     return (
       <p className="truncate text-sm text-slate-500">
         <span className="font-semibold text-slate-700">Filed by</span>{" "}
-        <span className="font-semibold text-slate-900">{displayName(user.name, user.showSalutations)}</span>
+        <ShownName name={user.name} className="font-semibold text-slate-900" />
         <span className="text-xs font-medium">
           {" "}
           · {ROLE_LABELS[user.role]} · {formatDate(todayISO())}
@@ -182,7 +183,7 @@ export function FiledBy({
     <Card className="bg-slate-50">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Report Filed By</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="text-base font-semibold">{displayName(user.name, user.showSalutations)}</span>
+        <ShownName name={user.name} className="text-base font-semibold" />
         <Badge>{ROLE_LABELS[user.role]}</Badge>
       </div>
       <p className="mt-0.5 text-sm text-slate-500">
