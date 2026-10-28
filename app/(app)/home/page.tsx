@@ -94,7 +94,7 @@ async function AdminHome({ user }: { user: CurrentUser }) {
             placement="section"
             sectionClassName="mb-1.5 mt-3"
             cards={
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @lg:grid-cols-4">
                 {groups.map((g) => (
                   <GroupMiniCard key={g.id} group={g} />
                 ))}

@@ -5,12 +5,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { CommunityGroup, FellowshipReport, User } from "@/data/types";
 import { recordError, recordSuccess } from "@/lib/activity-log";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getRealUser } from "@/lib/auth";
 import { getGroupById, getReportById, hasFellowshipOnDate, isLatestFiledReport } from "@/lib/data-access";
-import { combineDateAndTime, startOfDayTimestamp, todayISO } from "@/lib/format";
+import { combineDateAndTime, REPORT_TYPE_LABELS, startOfDayTimestamp, todayISO } from "@/lib/format";
 import { MAX_PHOTOS, storagePath } from "@/lib/photos";
 import { canEditFiledReport, canEditPlan, isGroupClosed } from "@/lib/report-rules";
-import { isAdminRole } from "@/lib/roles";
+import { isAdminRole, isSuperAdmin } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { photoFiles, removePhotos, uploadPhotos } from "@/lib/uploads";
 import type { FormState } from "./types";
@@ -426,4 +426,43 @@ export async function cancelPlan(planId: string): Promise<FormState> {
   });
   revalidatePath("/", "layout");
   redirect(`/reports/${planId}?saved=cancelled`);
+}
+
+/** Permanently removes a report. Only the real Super Admin session may do this (not login-as). */
+export async function deleteReport(reportId: string): Promise<FormState> {
+  const action = "report_delete";
+  const user = await getRealUser();
+  if (!user) return reportFail(action, "Report delete failed", "Your session has ended. Please sign in again.");
+  if (!isSuperAdmin(user.role)) {
+    return reportFail(action, "Report delete failed", "Only a Super Admin can delete reports.");
+  }
+
+  const report = await getReportById(reportId);
+  if (!report) return reportFail(action, "Report delete failed", "This report could not be found.");
+
+  const photoPaths =
+    report.type === "fellowship" ? fellowshipPhotoPaths(report) : ([] as string[]);
+  if ("error" in photoPaths) {
+    return reportFail(action, "Report delete failed", photoPaths.error);
+  }
+
+  const group = await getGroupById(report.groupId);
+  const supabase = await createClient();
+  const { error } = await supabase.from("reports").delete().eq("id", reportId);
+  if (error) {
+    return reportFail(action, "Report delete failed", `Could not delete the report: ${error.message}`);
+  }
+
+  await removePhotos(supabase, "report-photos", photoPaths);
+
+  const label = REPORT_TYPE_LABELS[report.type];
+  recordSuccess({
+    feature: "reports",
+    action,
+    summary: group ? `Deleted ${label.toLowerCase()} for ${group.name}` : `Deleted ${label.toLowerCase()}`,
+    entityType: "report",
+    entityId: reportId,
+  });
+  revalidatePath("/", "layout");
+  redirect("/reports");
 }

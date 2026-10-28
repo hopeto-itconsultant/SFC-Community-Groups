@@ -5,7 +5,7 @@ export function isAdminRole(role: Role): boolean {
   return role === "admin" || role === "superadmin";
 }
 
-/** Superadmin-only capabilities (login-as, activity log). */
+/** Superadmin-only capabilities (login-as, activity log, delete reports). */
 export function isSuperAdmin(role: Role): boolean {
   return role === "superadmin";
 }

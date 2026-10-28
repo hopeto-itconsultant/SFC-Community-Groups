@@ -80,7 +80,7 @@ function DayChips({ markers }: { markers: ReportDayMarker[] }) {
       {shown.map((marker) => (
         <span
           key={marker.id}
-          className={`block truncate rounded px-0.5 text-[9px] font-semibold leading-tight ${CHIP_CLASS[marker.type]}`}
+          className={`block truncate rounded px-0.5 text-[9px] font-semibold leading-tight @md:text-[11px] ${CHIP_CLASS[marker.type]}`}
         >
           {marker.groupName}
         </span>
@@ -118,75 +118,77 @@ export function ReportCalendar({
   }
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between px-1">
-        <button
-          type="button"
-          aria-label="Previous month"
-          onClick={() => showMonth(new Date(year, month - 1, 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-200"
-        >
-          <ChevronLeftIcon width={20} height={20} />
-        </button>
-        <h2 className="text-sm font-bold">{monthLabel}</h2>
-        <button
-          type="button"
-          aria-label="Next month"
-          onClick={() => showMonth(new Date(year, month + 1, 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-200"
-        >
-          <ChevronRightIcon width={20} height={20} />
-        </button>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-        <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-          {WEEKDAYS.map((day) => (
-            <span key={day}>{day}</span>
-          ))}
+    <div className="@md:grid @md:grid-cols-2 @md:items-start @md:gap-4">
+      <div>
+        <div className="mb-2 flex items-center justify-between px-1">
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => showMonth(new Date(year, month - 1, 1))}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-200"
+          >
+            <ChevronLeftIcon width={20} height={20} />
+          </button>
+          <h2 className="text-sm font-bold">{monthLabel}</h2>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => showMonth(new Date(year, month + 1, 1))}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-200"
+          >
+            <ChevronRightIcon width={20} height={20} />
+          </button>
         </div>
-        <div className="grid grid-cols-7 gap-px bg-slate-100 p-px">
-          {cells.map((iso, index) => {
-            if (!iso) return <div key={`empty-${index}`} className="min-w-0 bg-white" />;
-            const items = byDate.get(iso) ?? [];
-            const isSelected = iso === selected;
-            const isToday = iso === today;
-            const names = items.map((marker) => marker.groupName).filter((name) => name.length > 0);
-            return (
-              <button
-                key={iso}
-                type="button"
-                aria-pressed={isSelected}
-                aria-label={
-                  items.length
-                    ? `${formatDate(iso)}, ${items.length} report${items.length === 1 ? "" : "s"}: ${names.join(", ")}`
-                    : `${formatDate(iso)}, no reports`
-                }
-                onClick={() => setSelected(iso)}
-                className={`flex min-h-16 min-w-0 flex-col items-stretch bg-white px-0.5 py-1 text-left ${
-                  isSelected ? "ring-2 ring-inset ring-brand-700" : ""
-                }`}
-              >
-                <span
-                  className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
-                    isSelected
-                      ? "bg-brand-700 text-white"
-                      : isToday
-                        ? "bg-brand-100 text-brand-800"
-                        : "text-slate-700"
+
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            {WEEKDAYS.map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-px bg-slate-100 p-px">
+            {cells.map((iso, index) => {
+              if (!iso) return <div key={`empty-${index}`} className="min-w-0 bg-white" />;
+              const items = byDate.get(iso) ?? [];
+              const isSelected = iso === selected;
+              const isToday = iso === today;
+              const names = items.map((marker) => marker.groupName).filter((name) => name.length > 0);
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  aria-pressed={isSelected}
+                  aria-label={
+                    items.length
+                      ? `${formatDate(iso)}, ${items.length} report${items.length === 1 ? "" : "s"}: ${names.join(", ")}`
+                      : `${formatDate(iso)}, no reports`
+                  }
+                  onClick={() => setSelected(iso)}
+                  className={`flex min-h-16 min-w-0 flex-col items-stretch bg-white px-0.5 py-1 text-left @md:min-h-24 ${
+                    isSelected ? "ring-2 ring-inset ring-brand-700" : ""
                   }`}
                 >
-                  {parseLocalDate(iso).getDate()}
-                </span>
-                {items.length > 0 && <DayChips markers={items} />}
-              </button>
-            );
-          })}
+                  <span
+                    className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                      isSelected
+                        ? "bg-brand-700 text-white"
+                        : isToday
+                          ? "bg-brand-100 text-brand-800"
+                          : "text-slate-700"
+                    }`}
+                  >
+                    {parseLocalDate(iso).getDate()}
+                  </span>
+                  {items.length > 0 && <DayChips markers={items} />}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {selected && (
-        <section className="mt-4" aria-label={`Reports on ${formatDate(selected)}`}>
+        <section className="@container mt-4 @md:mt-0" aria-label={`Reports on ${formatDate(selected)}`}>
           <h3 className="mb-2 px-1 text-sm font-semibold">{formatDate(selected)}</h3>
           {days[selected] ?? <p className="px-1 text-sm text-slate-500">No reports on this day.</p>}
         </section>

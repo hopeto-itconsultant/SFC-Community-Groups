@@ -42,7 +42,7 @@ const tableInputClass =
   "block min-h-9 w-full min-w-0 rounded-md border border-slate-300 bg-white px-1 py-1 text-xs placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:bg-slate-50";
 
 const rosterGrid =
-  "grid grid-cols-[minmax(0,1fr)_6.75rem_3.75rem_3.5rem] items-center gap-1";
+  "grid grid-cols-[minmax(0,1fr)_6.75rem_3.75rem_3.5rem] items-center gap-1 @md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_8rem_4.25rem_4.5rem] @md:gap-2";
 
 const SAVE_HINT =
   "Enter a phone number, then update that row. A blank phone is left unchanged. Updating a phone for someone without a login creates one and shows the password once. An existing password stays the same unless you reset it. Change a name and other details from the person's name.";
@@ -348,7 +348,10 @@ function PeopleTable({
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
       <div className={`${rosterGrid} border-b border-slate-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500`}>
-        <span className="leading-tight tracking-normal">Name & group</span>
+        <span className="leading-tight tracking-normal">
+          Name<span className="@md:hidden"> & group</span>
+        </span>
+        <span className="hidden leading-tight tracking-normal @md:block">Group</span>
         <span className="leading-tight tracking-normal">Mobile no.</span>
         <span className="sr-only">Update</span>
         <span className="sr-only">Reset password</span>
@@ -372,7 +375,7 @@ function PeopleTable({
                 >
                   {row.shownName}
                 </Link>
-                <span className="mt-0.5 flex items-center gap-1 text-[11px] font-medium leading-snug text-slate-500">
+                <span className="mt-0.5 flex items-center gap-1 text-[11px] font-medium leading-snug text-slate-500 @md:hidden">
                   <span className="min-w-0 truncate" title={groupLabel}>
                     {groupLabel}
                   </span>
@@ -395,6 +398,16 @@ function PeopleTable({
                 ) : (
                   savedId === row.id &&
                   unchangedIds[row.id] && <p className="mt-1 text-xs font-medium text-slate-500">Password unchanged.</p>
+                )}
+              </div>
+              <div className="hidden min-w-0 @md:block">
+                <span className="block truncate text-xs font-medium text-slate-600" title={groupLabel}>
+                  {groupLabel}
+                </span>
+                {row.groups.some((group) => group.status === "closed") && (
+                  <span className="mt-0.5 inline-block">
+                    <Badge tone="slate">Closed</Badge>
+                  </span>
                 )}
               </div>
               <input

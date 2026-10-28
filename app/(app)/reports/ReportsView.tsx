@@ -102,7 +102,7 @@ async function ReportsOverview({ scope: { isAdmin, groupId, subtitle } }: { scop
         action={!isAdmin && <NewReportButton href="/new" label="New Report" />}
       />
 
-      <div className="space-y-2.5 px-4 py-3">
+      <div className="grid grid-cols-1 gap-2.5 px-4 py-3 @md:grid-cols-2">
         {REPORT_TYPES.map((type) => (
           <ReportTypeCard key={type} kind={type} summaries={summaries} href={reportsHref({ type, group })} />
         ))}
@@ -156,7 +156,7 @@ function ReportCollection({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
       {reports.map((r) =>
         expenses && r.type === "fellowship" ? (
           <ExpenseCard key={r.id} report={r} />
