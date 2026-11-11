@@ -73,6 +73,11 @@ export type ReportPeriod = "this-month" | "upcoming";
 
 export interface ReportQuery {
   groupId?: string;
+  /**
+   * `next-fellowship` is upcoming plans only: not cancelled, scheduled today or later
+   * in Asia/Kolkata. A meeting later today still counts. Other types are not date-limited,
+   * so past plans stay in views such as filed this month.
+   */
   type?: ReportType;
   period?: ReportPeriod;
   /** Only fellowship reports that recorded an expense. */

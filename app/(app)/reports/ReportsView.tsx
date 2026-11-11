@@ -6,10 +6,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { ReportCalendar, type ReportDayMarker } from "@/components/ReportCalendar";
 import {
   CARD_LABELS,
-  ExpenseCard,
+  ExpenseListRow,
   FellowshipListRow,
   FollowUpTable,
-  ReportCard,
+  ReportListRow,
+  ReportListShell,
   ReportTypeCard,
 } from "@/components/reports";
 import { EmptyState, LinkButton } from "@/components/ui";
@@ -142,11 +143,11 @@ function ReportCollection({
   if (fellowshipListing) {
     const fellowshipReports = reports.filter((r): r is FellowshipReport => r.type === "fellowship");
     return (
-      <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+      <ReportListShell>
         {fellowshipReports.map((r) => (
           <FellowshipListRow key={r.id} report={r} />
         ))}
-      </div>
+      </ReportListShell>
     );
   }
 
@@ -155,16 +156,17 @@ function ReportCollection({
     return <FollowUpTable reports={followUpReports} />;
   }
 
+  const showType = new Set(reports.map((r) => r.type)).size > 1;
   return (
-    <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
+    <ReportListShell>
       {reports.map((r) =>
         expenses && r.type === "fellowship" ? (
-          <ExpenseCard key={r.id} report={r} />
+          <ExpenseListRow key={r.id} report={r} />
         ) : (
-          <ReportCard key={r.id} report={r} />
+          <ReportListRow key={r.id} report={r} showType={showType} />
         ),
       )}
-    </div>
+    </ReportListShell>
   );
 }
 
@@ -233,8 +235,12 @@ async function ReportsTypeList({
       />
     );
   }
-  const emptyDescription =
-    period || (isAdmin && groupId) ? "Try a different filter." : "Nothing has been filed yet.";
+  const upcomingList = type === "next-fellowship" && period !== "this-month";
+  const emptyDescription = upcomingList
+    ? "No upcoming fellowship planned."
+    : period || (isAdmin && groupId)
+      ? "Try a different filter."
+      : "Nothing has been filed yet.";
 
   return (
     <>
@@ -284,7 +290,7 @@ async function ReportsTypeList({
             </p>
           }
           periodChip={
-            period ? (
+            period && !upcomingList ? (
               <Link
                 href={reportsHref({ ...params, period: undefined })}
                 replace
@@ -296,7 +302,7 @@ async function ReportsTypeList({
               </Link>
             ) : undefined
           }
-          grid={
+          list={
             reports.length ? (
               <ReportCollection
                 reports={reports}

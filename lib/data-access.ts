@@ -243,8 +243,14 @@ const loadReports = cache(
       query = query
         .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
         .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
-    } else if (period === "upcoming") {
-      query = query.eq("type", "next-fellowship").is("cancelled_at", null).gte("report_date", startOfDayTimestamp(today));
+    }
+    // Same cutoff as the upcoming loader: local midnight, so a meeting later today still counts.
+    // Past and cancelled plans stay in other queries (for example, filed this month).
+    if (type === "next-fellowship" || period === "upcoming") {
+      query = query
+        .eq("type", "next-fellowship")
+        .is("cancelled_at", null)
+        .gte("report_date", startOfDayTimestamp(today));
     }
     const soonestFirst = type === "next-fellowship" || period === "upcoming";
     const rows = unwrap<ReportRow[]>(
@@ -257,7 +263,7 @@ const loadReports = cache(
   },
 );
 
-/** Next fellowships run earliest date first. Other reports run newest first. */
+/** Upcoming next-fellowship plans run soonest first. Other reports run newest first. */
 export async function getReports({ groupId, type, period, withExpense = false }: ReportQuery = {}): Promise<
   Report[]
 > {

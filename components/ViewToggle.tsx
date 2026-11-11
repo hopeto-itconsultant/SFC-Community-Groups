@@ -6,7 +6,7 @@ import { CalendarIcon, GridIcon, ListIcon } from "./icons";
 import { SectionTitle } from "./ui";
 
 export type GroupView = "cards" | "list";
-export type ReportLayout = "calendar" | "grid";
+export type ReportLayout = "calendar" | "list";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -17,7 +17,7 @@ const VIEW_OPTIONS = [
 
 const LAYOUT_OPTIONS = [
   { value: "calendar", label: "Calendar view", icon: CalendarIcon },
-  { value: "grid", label: "Grid view", icon: GridIcon },
+  { value: "list", label: "List view", icon: ListIcon },
 ] as const;
 
 const REPORTS_LAYOUT_KEY = "sfc.reportsLayout";
@@ -45,12 +45,17 @@ export function useStoredView(storageKey: string): [GroupView, (view: GroupView)
   return [view, setView];
 }
 
-/** Calendar/Grid preference persisted in localStorage under `storageKey`; defaults to grid. */
+/** Saved `grid` is the old card layout; it opens the list. Anything except `calendar` does too. */
+export function reportLayoutFromStored(stored: string | null): ReportLayout {
+  return stored === "calendar" ? "calendar" : "list";
+}
+
+/** Calendar/List preference persisted in localStorage under `storageKey`; defaults to list. */
 export function useStoredReportLayout(storageKey: string): [ReportLayout, (view: ReportLayout) => void] {
   const view = useSyncExternalStore(
     subscribe,
-    () => (window.localStorage.getItem(storageKey) === "calendar" ? "calendar" : "grid"),
-    () => "grid" as const,
+    () => reportLayoutFromStored(window.localStorage.getItem(storageKey)),
+    () => "list" as const,
   );
 
   const setView = (next: ReportLayout) => {
@@ -107,16 +112,16 @@ export function ReportLayoutToggle({
   return <SegmentedIconToggle view={view} onChange={onChange} options={LAYOUT_OPTIONS} />;
 }
 
-/** Count line, period chip, and calendar/grid toggle, then the chosen report list. */
+/** Count line, period chip, and calendar/list toggle, then the chosen report list. */
 export function ReportLayoutSwitch({
   summary,
   periodChip,
-  grid,
+  list,
   calendar,
 }: {
   summary: ReactNode;
   periodChip?: ReactNode;
-  grid: ReactNode;
+  list: ReactNode;
   calendar: ReactNode;
 }) {
   const [layout, setLayout] = useStoredReportLayout(REPORTS_LAYOUT_KEY);
@@ -130,7 +135,7 @@ export function ReportLayoutSwitch({
           <ReportLayoutToggle view={layout} onChange={setLayout} />
         </div>
       </div>
-      {layout === "calendar" ? calendar : grid}
+      {layout === "calendar" ? calendar : list}
     </>
   );
 }
