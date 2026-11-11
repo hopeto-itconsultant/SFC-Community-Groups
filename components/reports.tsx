@@ -23,6 +23,7 @@ import {
   formatShortDate,
   formatShortDateDay,
   formatShortDateTimeDay,
+  formatTime,
   todayISO,
 } from "@/lib/format";
 import { photoVariant } from "@/lib/photos";
@@ -147,37 +148,6 @@ export async function ReportCard({ report }: { report: Report }) {
   );
 }
 
-/** List item for the expenditures view: the amount and what it was spent on. */
-export async function ExpenseCard({ report }: { report: FellowshipReport }) {
-  const [group, filedBy] = await groupAndFiler(report);
-  return (
-    <Link
-      href={`/reports/${report.id}`}
-      prefetch={false}
-      className="cv-item block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-lg font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
-          <p className="truncate text-sm font-medium text-brand-700">{group?.name}</p>
-        </div>
-        <p className="shrink-0 text-sm text-slate-500">{formatDateTimeDay(report.date, report.time)}</p>
-      </div>
-      {report.expenseDetails && (
-        <p className="mt-2 line-clamp-2 text-sm text-slate-600">{report.expenseDetails}</p>
-      )}
-      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
-        <p className="min-w-0 truncate text-slate-500">
-          Filed by <span className="font-medium text-slate-700">{filedBy}</span>
-        </p>
-        <span className="flex shrink-0 items-center font-semibold text-brand-700">
-          View <ChevronRightIcon width={18} height={18} />
-        </span>
-      </div>
-    </Link>
-  );
-}
-
 /** Dense row for the all-groups fellowship listing. */
 export async function FellowshipListRow({ report }: { report: FellowshipReport }) {
   const group = await getGroupById(report.groupId);
@@ -219,6 +189,93 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
           />
         </div>
       )}
+      <ChevronRightIcon width={18} height={18} className="shrink-0 text-brand-700" />
+    </Link>
+  );
+}
+
+const LIST_TYPE_LABEL: Record<ReportType, string> = {
+  fellowship: "Fellowship",
+  "follow-up": "Follow-up",
+  "next-fellowship": "Next",
+};
+
+export function ReportListShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+      {children}
+    </div>
+  );
+}
+
+/** One tappable row in the Reports list. `showType` marks mixed lists such as filed this month. */
+export async function ReportListRow({ report, showType = false }: { report: Report; showType?: boolean }) {
+  const [group, , shown] = await groupAndFiler(report);
+  const when = formatShortDateDay(report.type === "next-fellowship" ? report.proposedDate : report.date);
+  const clock = report.type !== "follow-up" && report.time ? `${formatTime(report.time)} · ` : "";
+  const detail =
+    report.type === "follow-up"
+      ? `${shown(report.personName)} · ${contactModeLabel(report.mode)}`
+      : report.type === "next-fellowship"
+        ? report.activity
+          ? `${report.location} · ${report.activity}`
+          : report.location
+        : report.summary
+          ? `${report.location} · ${report.summary}`
+          : report.location;
+  const note = report.type === "follow-up" ? report.comments : undefined;
+
+  return (
+    <Link
+      href={`/reports/${report.id}`}
+      prefetch={false}
+      className="flex items-center gap-2 px-3 py-2.5 active:bg-slate-50"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <p className="shrink-0 text-sm font-bold">{when}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+          {report.type === "fellowship" && (
+            <p className="shrink-0 text-sm">
+              <span className="font-bold">{report.attendees}</span>
+              {report.firstTimers > 0 && (
+                <span className="ml-1 text-xs font-semibold text-emerald-700">+{report.firstTimers}</span>
+              )}
+            </p>
+          )}
+        </div>
+        <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
+          {showType && <span className="font-medium text-slate-500">{LIST_TYPE_LABEL[report.type]} · </span>}
+          {clock}
+          {detail}
+        </p>
+        {note && <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{note}</p>}
+      </div>
+      {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
+      <ChevronRightIcon width={18} height={18} className="shrink-0 text-brand-700" />
+    </Link>
+  );
+}
+
+/** Expenditure row: the amount, the group, then the date and what it was spent on. */
+export async function ExpenseListRow({ report }: { report: FellowshipReport }) {
+  const [group] = await groupAndFiler(report);
+  return (
+    <Link
+      href={`/reports/${report.id}`}
+      prefetch={false}
+      className="flex items-center gap-2 px-3 py-2.5 active:bg-slate-50"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <p className="shrink-0 text-sm font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+        </div>
+        <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
+          {formatShortDateTimeDay(report.date, report.time)}
+          {report.expenseDetails ? ` · ${report.expenseDetails}` : ""}
+        </p>
+      </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-brand-700" />
     </Link>
   );
