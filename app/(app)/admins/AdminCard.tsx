@@ -57,6 +57,7 @@ export function AdminCard({ admin, isYou }: { admin: AdminAccount; isYou: boolea
           <ConfirmCard
             title={`Deactivate ${shown(admin.name)}?`}
             description="They won't be able to sign in. Their account is kept, and you can turn it back on."
+            pending={pending}
             confirmLabel={pending ? "Deactivating…" : "Deactivate"}
             onBack={() => setMode("idle")}
             onConfirm={() => changeActive(false)}

@@ -20,6 +20,7 @@ export function CloseGroupButton({ groupId, groupName }: { groupId: string; grou
         <ConfirmCard
           title={`Close ${groupName}?`}
           description="The group will be hidden from the dashboard and lists. Its past reports are kept and can still be viewed."
+          pending={pending}
           confirmLabel={pending ? "Closing…" : "Close group"}
           onBack={() => setConfirming(false)}
           onConfirm={() =>

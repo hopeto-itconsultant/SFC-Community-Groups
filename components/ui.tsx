@@ -107,29 +107,58 @@ export function InfoRow({ label, children }: { label: string; children: ReactNod
   );
 }
 
+function confirmLocked(target: HTMLElement) {
+  return target.closest("[role='alertdialog']")?.getAttribute("data-confirm-lock") === "true";
+}
+
 /** Inline "are you sure?" step for destructive actions such as closing a group or cancelling a plan. */
 export function ConfirmCard({
   title,
   description,
   confirmLabel,
+  pending = false,
   onConfirm,
   onBack,
 }: {
   title: string;
   description?: string;
   confirmLabel: string;
+  /** True while the confirm action is running. */
+  pending?: boolean;
   onConfirm: () => void;
   onBack: () => void;
 }) {
   return (
-    <div role="alertdialog" aria-label={title} className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+    <div
+      role="alertdialog"
+      aria-label={title}
+      aria-busy={pending || undefined}
+      data-confirm-lock={pending ? "true" : undefined}
+      className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200"
+    >
       <p className="font-bold text-red-800">{title}</p>
       {description && <p className="mt-1 text-sm text-red-700">{description}</p>}
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button variant="secondary" onClick={onBack}>
+        <Button
+          variant="secondary"
+          disabled={pending}
+          onClick={(event) => {
+            if (pending || confirmLocked(event.currentTarget)) return;
+            onBack();
+          }}
+        >
           Back
         </Button>
-        <Button variant="danger-solid" onClick={onConfirm}>
+        <Button
+          variant="danger-solid"
+          disabled={pending}
+          onClick={(event) => {
+            const root = event.currentTarget.closest("[role='alertdialog']");
+            if (pending || root?.getAttribute("data-confirm-lock") === "true") return;
+            root?.setAttribute("data-confirm-lock", "true");
+            onConfirm();
+          }}
+        >
           {confirmLabel}
         </Button>
       </div>

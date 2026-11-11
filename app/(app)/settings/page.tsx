@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ChevronRightIcon, LogOutIcon } from "@/components/icons";
+import { ChevronRightIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
-import { Badge, Button, Card, InfoRow, SectionTitle } from "@/components/ui";
+import { Badge, Card, InfoRow, SectionTitle } from "@/components/ui";
 import { signOut } from "@/lib/actions/auth";
 import { getNameDisplay, getRealUser, requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
@@ -12,6 +12,7 @@ import { isAdminRole, isSuperAdmin } from "@/lib/roles";
 import { HiddenSalutationsForm } from "./HiddenSalutationsForm";
 import { InstallAppLink } from "./InstallAppLink";
 import { SalutationToggle } from "./SalutationToggle";
+import { SignOutButton } from "./SignOutButton";
 
 export default async function SettingsPage() {
   const [user, real] = await Promise.all([requireUser(), getRealUser()]);
@@ -127,11 +128,8 @@ export default async function SettingsPage() {
           <p>Reports and photos are saved securely and shared only with your group&apos;s leaders and the Admin.</p>
         </Card>
 
-        <form action={signOut} className="mt-4">
-          <Button type="submit" variant="secondary" size="lg" block>
-            <LogOutIcon width={20} height={20} />
-            Sign out
-          </Button>
+        <form action={signOut} data-sign-out="" className="mt-4">
+          <SignOutButton />
         </form>
       </div>
     </>

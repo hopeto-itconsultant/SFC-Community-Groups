@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "./icons";
 
@@ -12,6 +12,8 @@ interface PhotoViewerProps {
   alt?: string;
 }
 
+const subscribeNoop = () => () => {};
+
 /**
  * Full-screen in-app photo viewer. Keeps the PWA open (no new tab).
  * Shows the full-resolution URL with object-contain.
@@ -19,22 +21,23 @@ interface PhotoViewerProps {
  */
 export function PhotoViewer({ photos, index: startIndex, onClose, alt = "Photo" }: PhotoViewerProps) {
   const [index, setIndex] = useState(startIndex);
-  const [mounted, setMounted] = useState(false);
+  const [trackedStart, setTrackedStart] = useState(startIndex);
+  const mounted = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
   const count = photos.length;
+
+  if (startIndex !== trackedStart) {
+    setTrackedStart(startIndex);
+    setIndex(startIndex);
+  }
+
   const src = photos[index];
 
-  onCloseRef.current = onClose;
-
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    setIndex(startIndex);
-  }, [startIndex]);
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!mounted) return;

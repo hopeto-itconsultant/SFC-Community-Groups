@@ -60,6 +60,7 @@ export function MemberCard({
           <ConfirmCard
             title={`Remove ${shown(member.name)} from this group?`}
             description="Their past reports are kept. Their login stays, but they won't see this group any more."
+            pending={removing}
             confirmLabel={removing ? "Removing…" : "Remove"}
             onBack={() => setMode("idle")}
             onConfirm={() =>
