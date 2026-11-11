@@ -58,6 +58,94 @@ textarea {
   contain-intrinsic-size: auto 11rem;
 }
 
+/* Slim bar at the top of the screen while an in-app navigation is in flight. */
+.nav-progress {
+  pointer-events: none;
+  position: fixed;
+  top: env(safe-area-inset-top);
+  right: 0;
+  left: 0;
+  z-index: 70;
+  height: 3px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+html[data-nav="pending"] .nav-progress {
+  opacity: 1;
+  background: var(--color-brand-100);
+}
+
+html[data-nav="pending"] .nav-progress > span {
+  display: block;
+  height: 100%;
+  width: 35%;
+  background: var(--color-brand-700);
+  animation: nav-slide 0.9s ease-in-out infinite;
+}
+
+/* Dim the tapped link and block a second tap without letting it fall through. */
+a[data-nav-pending] {
+  position: relative;
+  cursor: progress;
+}
+
+a[data-nav-pending]::before,
+a[data-nav-pending]::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+a[data-nav-pending]::before {
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(241 245 249 / 0.72);
+}
+
+a[data-nav-pending]::after {
+  top: 50%;
+  left: 50%;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: -0.575rem 0 0 -0.575rem;
+  border: 2px solid var(--color-brand-200);
+  border-top-color: var(--color-brand-700);
+  border-radius: 9999px;
+  animation: nav-spin 0.6s linear infinite;
+}
+
+@keyframes nav-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+@keyframes nav-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-nav="pending"] .nav-progress > span,
+  a[data-nav-pending]::after {
+    animation: none;
+  }
+
+  html[data-nav="pending"] .nav-progress > span {
+    width: 100%;
+  }
+
+  a[data-nav-pending]::after {
+    border-color: var(--color-brand-700);
+  }
+}
+
 /* Safari 15–16.3 draws a gray border on lazy images. */
 @supports (font: -apple-system-body) and (-webkit-appearance: none) {
   img[loading="lazy"] {

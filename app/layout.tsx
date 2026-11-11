@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DeferredAnalytics } from "@/components/DeferredAnalytics";
+import { NavigationFeedback } from "@/components/NavigationFeedback";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import { APP_NAME, PWA_NAME, THEME_COLOR } from "@/lib/brand";
 import "./globals.css";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full">
+        <NavigationFeedback />
         {children}
         <RegisterServiceWorker />
         <DeferredAnalytics />

@@ -45,6 +45,7 @@ export function DeleteReportButton({
         <ConfirmCard
           title={copy.title}
           description={copy.description}
+          pending={pending}
           confirmLabel={pending ? "Deleting…" : "Delete permanently"}
           onBack={() => setConfirming(false)}
           onConfirm={() =>

@@ -15,6 +15,7 @@ export function PlanActions({ planId }: { planId: string }) {
         <ConfirmCard
           title="Cancel this fellowship plan?"
           description="The plan will no longer show as upcoming. It stays in the group's reports."
+          pending={pending}
           confirmLabel={pending ? "Cancelling…" : "Cancel plan"}
           onBack={() => setConfirming(false)}
           onConfirm={() =>
