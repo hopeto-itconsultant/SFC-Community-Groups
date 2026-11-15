@@ -11,8 +11,13 @@ import { canEditFiledReport, canEditPlan } from "@/lib/report-rules";
 export default async function EditReportPage({ params }: PageProps<"/reports/[id]/edit">) {
   const [{ id }, user] = await Promise.all([params, requireUser()]);
   const report = await getReportById(id);
-  const group = await getGroupById(report?.groupId);
-  if (!report || !group) return <NotAvailable message="This report could not be found." />;
+  if (!report) return <NotAvailable message="This report could not be found." />;
+  const filed = report.type === "fellowship" || report.type === "follow-up" ? report : null;
+  const [group, latest] = await Promise.all([
+    getGroupById(report.groupId),
+    filed ? isLatestFiledReport(filed) : Promise.resolve(false),
+  ]);
+  if (!group) return <NotAvailable message="This report could not be found." />;
 
   if (report.type === "next-fellowship") {
     if (!canEditPlan(user, report)) {
@@ -32,7 +37,7 @@ export default async function EditReportPage({ params }: PageProps<"/reports/[id
     );
   }
 
-  if (!canEditFiledReport(user, report, group, await isLatestFiledReport(report))) {
+  if (!canEditFiledReport(user, report, group, latest)) {
     return <NotAvailable message="This report can no longer be changed." />;
   }
 

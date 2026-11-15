@@ -5,7 +5,9 @@ import { NextFellowshipSummary, ReportCard } from "@/components/reports";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
 import { SavedBanner } from "@/components/SavedBanner";
 import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { getGroupById, getNextFellowship, getReports } from "@/lib/data-access";
+import { getNameDisplay } from "@/lib/auth";
+import { getGroupDetail, getLabeledReports, getNextFellowship } from "@/lib/data-access";
+import { formatMemberNames } from "@/lib/group-card-model";
 import { isGroupClosed } from "@/lib/report-rules";
 import { CloseGroupButton } from "./CloseGroupButton";
 
@@ -20,49 +22,64 @@ export default async function AdminGroupPage({ params, searchParams }: PageProps
   );
 }
 
-function RecentList({ reports, empty }: { reports: Report[]; empty: string }) {
+function RecentList({
+  reports,
+  empty,
+  groupName,
+  shown,
+}: {
+  reports: { report: Report; filerName: string }[];
+  empty: string;
+  groupName: string;
+  shown: (name: string) => string;
+}) {
   if (!reports.length) return <EmptyState title={empty} />;
   return (
     <div className="space-y-3">
-      {reports.slice(0, RECENT_LIMIT).map((r) => (
-        <ReportCard key={r.id} report={r} />
+      {reports.map(({ report, filerName }) => (
+        <ReportCard key={report.id} report={report} groupName={groupName} filerName={filerName} shown={shown} />
       ))}
     </div>
   );
 }
 
 async function AdminGroupView({ id, saved }: { id: string; saved?: string }) {
-  const group = await getGroupById(id);
-  if (!group) return <NotAvailable message="This group could not be found." />;
+  const detail = await getGroupDetail(id);
+  if (!detail) return <NotAvailable message="This group could not be found." />;
 
-  const closed = isGroupClosed(group);
-  const [next, fellowships, followUps] = await Promise.all([
-    closed ? undefined : getNextFellowship(group.id),
-    getReports({ groupId: group.id, type: "fellowship" }),
-    getReports({ groupId: group.id, type: "follow-up" }),
+  const closed = isGroupClosed(detail.group);
+  const [shown, next, fellowships, followUps] = await Promise.all([
+    getNameDisplay(),
+    closed ? Promise.resolve(undefined) : getNextFellowship(detail.group.id),
+    getLabeledReports({ groupId: detail.group.id, type: "fellowship", limit: RECENT_LIMIT }),
+    getLabeledReports({ groupId: detail.group.id, type: "follow-up", limit: RECENT_LIMIT }),
   ]);
   const banner =
     saved === "added"
-      ? `${group.name} added`
+      ? `${detail.group.name} added`
       : saved === "updated"
-        ? `${group.name} updated`
+        ? `${detail.group.name} updated`
         : saved === "closed"
-          ? `${group.name} closed. Past reports are kept.`
+          ? `${detail.group.name} closed. Past reports are kept.`
           : undefined;
 
   return (
     <>
-      <PageHeader title={group.name} subtitle={group.category} backHref="/groups" />
+      <PageHeader title={detail.group.name} subtitle={detail.group.category} backHref="/groups" />
       <div className="p-4">
         {banner && <SavedBanner title={banner} />}
 
-        <GroupProfile group={group} />
+        <GroupProfile
+          group={detail.group}
+          leaders={formatMemberNames(detail.leaders, shown)}
+          assistants={formatMemberNames(detail.assistants, shown)}
+        />
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <LinkButton href={`/groups/${group.id}/people`} variant="secondary">
+          <LinkButton href={`/groups/${detail.group.id}/people`} variant="secondary">
             Leaders &amp; logins
           </LinkButton>
           {!closed && (
-            <LinkButton href={`/groups/${group.id}/edit`} variant="secondary">
+            <LinkButton href={`/groups/${detail.group.id}/edit`} variant="secondary">
               Edit Group details
             </LinkButton>
           )}
@@ -76,18 +93,28 @@ async function AdminGroupView({ id, saved }: { id: string; saved?: string }) {
         )}
 
         <SectionTitle>Recent Fellowship Reports</SectionTitle>
-        <RecentList reports={fellowships} empty="No fellowship reports yet" />
+        <RecentList
+          reports={fellowships.map((item) => ({ report: item.report, filerName: item.filerName }))}
+          empty="No fellowship reports yet"
+          groupName={detail.group.name}
+          shown={shown}
+        />
 
         <SectionTitle>Recent Follow-ups</SectionTitle>
-        <RecentList reports={followUps} empty="No follow-up reports yet" />
+        <RecentList
+          reports={followUps.map((item) => ({ report: item.report, filerName: item.filerName }))}
+          empty="No follow-up reports yet"
+          groupName={detail.group.name}
+          shown={shown}
+        />
 
-        <LinkButton href={`/reports?group=${group.id}`} variant="secondary" block className="mt-6">
+        <LinkButton href={`/reports?group=${detail.group.id}`} variant="secondary" block className="mt-6">
           View all reports for this group
         </LinkButton>
 
         {!closed && (
           <div className="mt-8 border-t border-slate-200 pt-4">
-            <CloseGroupButton groupId={group.id} groupName={group.name} />
+            <CloseGroupButton groupId={detail.group.id} groupName={detail.group.name} />
           </div>
         )}
       </div>

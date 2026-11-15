@@ -5,13 +5,20 @@ import { Field, inputClass } from "@/components/form";
 import { EyeIcon, EyeOffIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { type SignInState, signIn } from "@/lib/actions/auth";
+import { clearPageCache } from "@/lib/page-cache";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, {});
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={action}
+      className="space-y-5"
+      onSubmit={() => {
+        clearPageCache();
+      }}
+    >
       <h2 className="text-lg font-bold">Sign in</h2>
 
       <Field label="Username or mobile number" required>

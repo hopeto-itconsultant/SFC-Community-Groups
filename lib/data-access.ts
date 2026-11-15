@@ -30,6 +30,13 @@ import { fileableFellowshipPlans, type ReportQuery, type ReportTypeSummaries } f
 
 type GroupRole = "leader" | "asst-leader";
 
+interface GroupLeaderJoin {
+  profile_id: string;
+  role: GroupRole;
+  created_at: string;
+  profiles: { name: string } | { name: string }[] | null;
+}
+
 interface GroupRow {
   id: string;
   name: string;
@@ -38,7 +45,7 @@ interface GroupRow {
   photo_path: string | null;
   status: GroupStatus;
   closed_at: string | null;
-  group_leaders: { profile_id: string; role: GroupRole; created_at: string }[];
+  group_leaders: GroupLeaderJoin[];
 }
 
 interface ProfileRow {
@@ -71,14 +78,18 @@ interface ReportRow {
   goals: string | null;
   cancelled_at: string | null;
   created_at: string;
+  groups?: { name: string } | { name: string }[] | null;
+  filer?: { name: string } | { name: string }[] | null;
 }
 
 const GROUP_COLUMNS =
-  "id, name, category, frequency, photo_path, status, closed_at, group_leaders(profile_id, role, created_at)";
+  "id, name, category, frequency, photo_path, status, closed_at, group_leaders(profile_id, role, created_at, profiles(name))";
 const PROFILE_COLUMNS = "id, name, is_admin, is_superadmin, group_leaders(group_id, role, created_at)";
 const REPORT_COLUMNS =
   "id, group_id, type, filed_by, report_date, location, comments, attendees, first_timers, summary, " +
   "expense_amount, expense_details, photo_paths, person_name, contact_mode, activity, goals, cancelled_at, created_at";
+const REPORT_LIST_COLUMNS =
+  `${REPORT_COLUMNS}, groups!reports_group_id_fkey(name), filer:profiles!reports_filed_by_fkey(name)`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -175,29 +186,97 @@ function unwrap<T>(what: string, { data, error }: { data: unknown; error: { mess
   return data as T;
 }
 
-const loadGroups = cache(async (includeClosed: boolean): Promise<CommunityGroup[]> => {
+export interface DirectoryPerson {
+  id: string;
+  name: string;
+}
+
+export interface GroupDirectoryEntry {
+  group: CommunityGroup;
+  leaders: DirectoryPerson[];
+  assistants: DirectoryPerson[];
+}
+
+export interface GroupChoice {
+  id: string;
+  name: string;
+  status: GroupStatus;
+}
+
+function embeddedName(value: { name: string } | { name: string }[] | null | undefined): string {
+  if (!value) return "";
+  const row = Array.isArray(value) ? value[0] : value;
+  return row?.name ?? "";
+}
+
+function toDirectoryEntry(row: GroupRow): GroupDirectoryEntry {
+  const leaders = [...row.group_leaders].sort(byCreatedAt);
+  const people = (role: GroupRole) =>
+    leaders
+      .filter((leader) => leader.role === role)
+      .map((leader) => ({ id: leader.profile_id, name: embeddedName(leader.profiles) }));
+  return { group: toGroup(row), leaders: people("leader"), assistants: people("asst-leader") };
+}
+
+const loadGroupDirectory = cache(async (includeClosed: boolean): Promise<GroupDirectoryEntry[]> => {
   const supabase = await createClient();
   let query = supabase.from("groups").select(GROUP_COLUMNS);
   if (!includeClosed) query = query.eq("status", "active");
   const rows = unwrap<GroupRow[]>("groups", await query);
-  return rows.map(toGroup).sort((a, b) => a.name.localeCompare(b.name));
+  return rows.map(toDirectoryEntry).sort((a, b) => a.group.name.localeCompare(b.group.name));
 });
 
 /** Active groups by name; closed groups are only included when asked for. */
 export async function getGroups({ includeClosed = false }: { includeClosed?: boolean } = {}): Promise<
   CommunityGroup[]
 > {
-  return loadGroups(includeClosed);
+  return (await loadGroupDirectory(includeClosed)).map((entry) => entry.group);
 }
+
+/** Groups with leader and assistant names, from the same query as `getGroups`. */
+export async function getGroupDirectory({ includeClosed = false }: { includeClosed?: boolean } = {}): Promise<
+  GroupDirectoryEntry[]
+> {
+  return loadGroupDirectory(includeClosed);
+}
+
+/** Id, name, and status only — for filters and pickers that do not show leaders. */
+export const getGroupChoices = cache(async (): Promise<GroupChoice[]> => {
+  const supabase = await createClient();
+  const rows = unwrap<GroupChoice[]>(
+    "groups",
+    await supabase.from("groups").select("id, name, status").order("name"),
+  );
+  return rows;
+});
 
 export async function getClosedGroupCount(): Promise<number> {
-  return (await loadGroups(true)).filter((g) => g.status === "closed").length;
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("groups")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "closed");
+  if (error) throw new Error(`Could not count groups: ${error.message}`);
+  return count ?? 0;
 }
 
-/** Served from one cached list so screens can look up many groups per request with one query. */
-export async function getGroupById(id: string | undefined): Promise<CommunityGroup | undefined> {
+const loadGroupDetail = cache(async (id: string): Promise<GroupDirectoryEntry | undefined> => {
+  const supabase = await createClient();
+  const row = unwrap<GroupRow | null>(
+    "group",
+    await supabase.from("groups").select(GROUP_COLUMNS).eq("id", id).maybeSingle(),
+  );
+  return row ? toDirectoryEntry(row) : undefined;
+});
+
+/** One group, including its leaders' names. Does not load the rest of the directory. */
+export async function getGroupDetail(id: string | undefined): Promise<GroupDirectoryEntry | undefined> {
   if (!isUuid(id)) return undefined;
-  return (await loadGroups(true)).find((g) => g.id === id);
+  return loadGroupDetail(id);
+}
+
+export async function getGroupById(id: string | undefined): Promise<CommunityGroup | undefined> {
+  return (await getGroupDetail(id))?.group;
 }
 
 /** Everyone the signed-in user may see, by name; cached so name lookups share one query per request. */
@@ -207,9 +286,26 @@ export const getUsers = cache(async (): Promise<User[]> => {
   return rows.map(toUser);
 });
 
-export async function getUserById(id: string | undefined): Promise<User | undefined> {
+export const getUserById = cache(async (id: string | undefined): Promise<User | undefined> => {
   if (!isUuid(id)) return undefined;
-  return (await getUsers()).find((u) => u.id === id);
+  const supabase = await createClient();
+  const row = unwrap<ProfileRow | null>(
+    "person",
+    await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle(),
+  );
+  return row ? toUser(row) : undefined;
+});
+
+/** Display names for these profiles, one query. */
+export async function getProfileNames(ids: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter(isUuid))];
+  if (!unique.length) return new Map();
+  const supabase = await createClient();
+  const rows = unwrap<{ id: string; name: string }[]>(
+    "people",
+    await supabase.from("profiles").select("id, name").in("id", unique),
+  );
+  return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 async function getUsersInOrder(ids: string[]): Promise<User[]> {
@@ -226,48 +322,100 @@ export async function getGroupAssistantLeaders(group: CommunityGroup): Promise<U
   return getUsersInOrder(group.assistantLeaderIds);
 }
 
+export interface LabeledReport {
+  report: Report;
+  groupName: string;
+  filerName: string;
+}
+
+async function fetchReportRows({
+  groupId,
+  type,
+  period,
+  withExpense = false,
+  limit,
+  labeled = false,
+}: ReportQuery & { labeled?: boolean }): Promise<ReportRow[]> {
+  const supabase = await createClient();
+  let query = supabase.from("reports").select(labeled ? REPORT_LIST_COLUMNS : REPORT_COLUMNS);
+  if (groupId) query = query.eq("group_id", idFilter(groupId));
+  if (type) query = query.eq("type", type);
+  if (withExpense) query = query.eq("type", "fellowship").gt("expense_amount", 0);
+  const today = todayISO();
+  if (period === "this-month") {
+    query = query
+      .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
+      .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
+  }
+  // Same cutoff as the upcoming loader: local midnight, so a meeting later today still counts.
+  // Past and cancelled plans stay in other queries (for example, filed this month).
+  if (type === "next-fellowship" || period === "upcoming") {
+    query = query
+      .eq("type", "next-fellowship")
+      .is("cancelled_at", null)
+      .gte("report_date", startOfDayTimestamp(today));
+  }
+  const soonestFirst = type === "next-fellowship" || period === "upcoming";
+  let ordered = query.order("report_date", { ascending: soonestFirst }).order("created_at", { ascending: soonestFirst });
+  if (limit && limit > 0) ordered = ordered.limit(limit);
+  return unwrap<ReportRow[]>("reports", await ordered);
+}
+
 const loadReports = cache(
   async (
     groupId: string | undefined,
     type: ReportType | undefined,
     period: ReportQuery["period"],
     withExpense: boolean,
+    limit: number | undefined,
   ): Promise<Report[]> => {
-    const supabase = await createClient();
-    let query = supabase.from("reports").select(REPORT_COLUMNS);
-    if (groupId) query = query.eq("group_id", idFilter(groupId));
-    if (type) query = query.eq("type", type);
-    if (withExpense) query = query.eq("type", "fellowship").gt("expense_amount", 0);
-    const today = todayISO();
-    if (period === "this-month") {
-      query = query
-        .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
-        .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
-    }
-    // Same cutoff as the upcoming loader: local midnight, so a meeting later today still counts.
-    // Past and cancelled plans stay in other queries (for example, filed this month).
-    if (type === "next-fellowship" || period === "upcoming") {
-      query = query
-        .eq("type", "next-fellowship")
-        .is("cancelled_at", null)
-        .gte("report_date", startOfDayTimestamp(today));
-    }
-    const soonestFirst = type === "next-fellowship" || period === "upcoming";
-    const rows = unwrap<ReportRow[]>(
-      "reports",
-      await query
-        .order("report_date", { ascending: soonestFirst })
-        .order("created_at", { ascending: soonestFirst }),
-    );
+    const rows = await fetchReportRows({ groupId, type, period, withExpense, limit });
     return rows.map(toReport);
   },
 );
 
 /** Upcoming next-fellowship plans run soonest first. Other reports run newest first. */
-export async function getReports({ groupId, type, period, withExpense = false }: ReportQuery = {}): Promise<
+export async function getReports({ groupId, type, period, withExpense = false, limit }: ReportQuery = {}): Promise<
   Report[]
 > {
-  return loadReports(groupId, type, period, withExpense);
+  return loadReports(groupId, type, period, withExpense, limit);
+}
+
+const loadLabeledReports = cache(
+  async (
+    groupId: string | undefined,
+    type: ReportType | undefined,
+    period: ReportQuery["period"],
+    withExpense: boolean,
+    limit: number | undefined,
+  ): Promise<LabeledReport[]> => {
+    const rows = await fetchReportRows({ groupId, type, period, withExpense, limit, labeled: true });
+    return rows.map((row) => ({
+      report: toReport(row),
+      groupName: embeddedName(row.groups),
+      filerName: embeddedName(row.filer),
+    }));
+  },
+);
+
+/** Reports plus the group and filer names, so a list does not query those again per row. */
+export async function getLabeledReports(query: ReportQuery = {}): Promise<LabeledReport[]> {
+  return loadLabeledReports(query.groupId, query.type, query.period, query.withExpense ?? false, query.limit);
+}
+
+/** Reports created this calendar month, without downloading the rows. */
+export async function countReportsCreatedThisMonth(groupId?: string): Promise<number> {
+  const supabase = await createClient();
+  const today = todayISO();
+  let query = supabase
+    .from("reports")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startOfLocalDateISO(`${today.slice(0, 7)}-01`))
+    .lt("created_at", startOfLocalDateISO(nextMonthISO(today)));
+  if (groupId) query = query.eq("group_id", idFilter(groupId));
+  const { count, error } = await query;
+  if (error) throw new Error(`Could not count reports: ${error.message}`);
+  return count ?? 0;
 }
 
 export const getReportById = cache(async (id: string | undefined): Promise<Report | undefined> => {
@@ -298,32 +446,54 @@ export const getLastFellowship = cache(async (groupId: string): Promise<Fellowsh
   return row ? (toReport(row) as FellowshipReport) : undefined;
 });
 
-/** All upcoming plans the user may see, soonest first; one query shared by every group on a screen. */
-const loadUpcomingFellowships = cache(async (): Promise<NextFellowship[]> => {
+export interface UpcomingBrief {
+  id: string;
+  proposedDate: string;
+  time?: string;
+}
+
+/** Soonest upcoming plan for each group, plus the total number of upcoming plans. */
+export const getUpcomingBriefs = cache(async (): Promise<{ byGroup: Map<string, UpcomingBrief>; count: number }> => {
   const supabase = await createClient();
-  const rows = unwrap<ReportRow[]>(
+  const rows = unwrap<{ id: string; group_id: string; report_date: string }[]>(
     "upcoming fellowships",
     await supabase
       .from("reports")
-      .select(REPORT_COLUMNS)
+      .select("id, group_id, report_date")
       .eq("type", "next-fellowship")
       .is("cancelled_at", null)
       .gte("report_date", startOfDayTimestamp(todayISO()))
       .order("report_date", { ascending: true })
       .order("created_at", { ascending: true }),
   );
-  return rows.map(toReport) as NextFellowship[];
+  const byGroup = new Map<string, UpcomingBrief>();
+  for (const row of rows) {
+    if (byGroup.has(row.group_id)) continue;
+    const when = splitReportDateTime(row.report_date);
+    byGroup.set(row.group_id, { id: row.id, proposedDate: when.date, time: when.time });
+  }
+  return { byGroup, count: rows.length };
 });
 
-/** Upcoming planned fellowships (today or later), soonest first. */
-export async function getUpcomingFellowships(groupId?: string): Promise<NextFellowship[]> {
-  const all = await loadUpcomingFellowships();
-  return groupId ? all.filter((r) => r.groupId === groupId) : all;
-}
-
-export async function getNextFellowship(groupId: string): Promise<NextFellowship | undefined> {
-  return (await getUpcomingFellowships(groupId))[0];
-}
+/** The soonest upcoming plan for one group. */
+export const getNextFellowship = cache(async (groupId: string): Promise<NextFellowship | undefined> => {
+  const supabase = await createClient();
+  const row = unwrap<ReportRow | null>(
+    "next fellowship",
+    await supabase
+      .from("reports")
+      .select(REPORT_COLUMNS)
+      .eq("group_id", idFilter(groupId))
+      .eq("type", "next-fellowship")
+      .is("cancelled_at", null)
+      .gte("report_date", startOfDayTimestamp(todayISO()))
+      .order("report_date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  );
+  return row ? (toReport(row) as NextFellowship) : undefined;
+});
 
 /** Uncancelled plans for this group dated today or earlier that have no fellowship report yet. */
 export const getFileableFellowshipPlans = cache(async (groupId: string): Promise<NextFellowship[]> => {

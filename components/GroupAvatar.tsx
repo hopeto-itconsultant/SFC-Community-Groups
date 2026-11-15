@@ -1,5 +1,7 @@
 import Image from "next/image";
 import type { CommunityGroup } from "@/data/types";
+
+type AvatarGroup = Pick<CommunityGroup, "id" | "name" | "photo">;
 import { photoVariant } from "@/lib/photos";
 
 const PALETTE = [
@@ -42,7 +44,7 @@ export function GroupAvatar({
   group,
   size = "md",
 }: {
-  group: CommunityGroup;
+  group: AvatarGroup;
   size?: keyof typeof SIZES;
 }) {
   if (group.photo) {

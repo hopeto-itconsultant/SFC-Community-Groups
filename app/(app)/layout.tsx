@@ -1,28 +1,20 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/AppShell";
-import { getLoginAsLabel, getRealUser, requireUser } from "@/lib/auth";
-import { getGroupById } from "@/lib/data-access";
-import { getHiddenSalutations } from "@/lib/hidden-salutations";
-import { isSuperAdmin } from "@/lib/roles";
+import { ShellSync } from "@/components/ShellSync";
 import { SessionProvider } from "@/lib/session";
+import { SHELL_COOKIE, parseShellSnapshot } from "@/lib/shell";
+import { cookies } from "next/headers";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const user = await requireUser();
-  const [group, loginAsName, real, hiddenSalutations] = await Promise.all([
-    getGroupById(user.groupId),
-    getLoginAsLabel(),
-    getRealUser(),
-    getHiddenSalutations(),
-  ]);
+  const cookieStore = await cookies();
+  const shell = parseShellSnapshot(cookieStore.get(SHELL_COOKIE)?.value);
 
   return (
-    <SessionProvider user={user} group={group} hiddenSalutations={hiddenSalutations}>
-      <AppShell
-        role={user.role}
-        loginAsName={loginAsName}
-        wideLayout={!!real && isSuperAdmin(real.role)}
-      >
-        {children}
-      </AppShell>
+    <SessionProvider initial={shell}>
+      <AppShell>{children}</AppShell>
+      <Suspense fallback={null}>
+        <ShellSync />
+      </Suspense>
     </SessionProvider>
   );
 }

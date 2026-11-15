@@ -42,6 +42,13 @@ export async function proxy(request: NextRequest) {
     return redirect;
   }
 
+  // Skip the extra page render that used to decide between /home and /login.
+  if (pathname === "/" && data?.claims) {
+    const redirect = NextResponse.redirect(new URL("/home", request.url));
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  }
+
   return response;
 }
 

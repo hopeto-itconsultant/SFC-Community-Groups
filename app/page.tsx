@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
 
-export default async function RootPage() {
-  redirect((await getCurrentUser()) ? "/home" : "/login");
+/** Signed-out visitors are sent to /login by the proxy before this runs. */
+export default function RootPage() {
+  redirect("/home");
 }
