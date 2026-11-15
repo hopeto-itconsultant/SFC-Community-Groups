@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { returnToAdmin } from "@/lib/actions/auth";
+import { clearPageCache } from "@/lib/page-cache";
 import { useDisplayName } from "@/lib/session";
 
 /** One-line bar while an Admin is viewing as a leader. */
@@ -17,7 +18,12 @@ export function LoginAsBanner({ name }: { name: string }) {
       <button
         type="button"
         disabled={pending}
-        onClick={() => start(() => returnToAdmin())}
+        onClick={() =>
+          start(() => {
+            clearPageCache();
+            return returnToAdmin();
+          })
+        }
         className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold hover:bg-white/25 disabled:opacity-50"
       >
         {pending ? "…" : "Back to admin"}

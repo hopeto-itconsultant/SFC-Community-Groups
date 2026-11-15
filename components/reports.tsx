@@ -8,8 +8,6 @@ import type {
   Report,
   ReportType,
 } from "@/data/types";
-import { getNameDisplay } from "@/lib/auth";
-import { getGroupById, getGroups, getUserById } from "@/lib/data-access";
 import type { ReportTypeSummaries } from "@/lib/report-rules";
 import {
   CONTACT_MODES,
@@ -33,14 +31,8 @@ import { Badge, Card, InfoRow } from "./ui";
 
 type NameDisplay = (name: string) => string;
 
-/** The report's group, the filer's name, and the name formatter for the signed-in person. */
-async function groupAndFiler(report: Report) {
-  const [group, filer, shown] = await Promise.all([
-    getGroupById(report.groupId),
-    getUserById(report.filedBy),
-    getNameDisplay(),
-  ]);
-  return [group, filer ? shown(filer.name) : NOT_AVAILABLE, shown] as const;
+function filedByLabel(name: string | undefined, shown: NameDisplay): string {
+  return name ? shown(name) : NOT_AVAILABLE;
 }
 
 function plural(n: number, word: string) {
@@ -119,8 +111,18 @@ function ReportIdentity({
   );
 }
 
-export async function ReportCard({ report }: { report: Report }) {
-  const [group, filedBy, shown] = await groupAndFiler(report);
+export function ReportCard({
+  report,
+  groupName,
+  filerName,
+  shown,
+}: {
+  report: Report;
+  groupName?: string;
+  filerName?: string;
+  shown: NameDisplay;
+}) {
+  const filedBy = filedByLabel(filerName, shown);
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -129,7 +131,7 @@ export async function ReportCard({ report }: { report: Report }) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <ReportIdentity report={report} groupName={group?.name} />
+          <ReportIdentity report={report} groupName={groupName} />
         </div>
         {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
       </div>
@@ -149,8 +151,7 @@ export async function ReportCard({ report }: { report: Report }) {
 }
 
 /** Dense row for the all-groups fellowship listing. */
-export async function FellowshipListRow({ report }: { report: FellowshipReport }) {
-  const group = await getGroupById(report.groupId);
+export function FellowshipListRow({ report, groupName }: { report: FellowshipReport; groupName?: string }) {
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -160,7 +161,7 @@ export async function FellowshipListRow({ report }: { report: FellowshipReport }
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <p className="shrink-0 text-sm font-bold">{formatShortDateTimeDay(report.date, report.time)}</p>
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{groupName}</p>
           <p className="shrink-0 text-sm">
             <span className="font-bold">{report.attendees}</span>
             {report.firstTimers > 0 && (
@@ -209,8 +210,17 @@ export function ReportListShell({ children }: { children: ReactNode }) {
 }
 
 /** One tappable row in the Reports list. `showType` marks mixed lists such as filed this month. */
-export async function ReportListRow({ report, showType = false }: { report: Report; showType?: boolean }) {
-  const [group, , shown] = await groupAndFiler(report);
+export function ReportListRow({
+  report,
+  groupName,
+  shown,
+  showType = false,
+}: {
+  report: Report;
+  groupName?: string;
+  shown: NameDisplay;
+  showType?: boolean;
+}) {
   const when = formatShortDateDay(report.type === "next-fellowship" ? report.proposedDate : report.date);
   const clock = report.type !== "follow-up" && report.time ? `${formatTime(report.time)} · ` : "";
   const detail =
@@ -234,7 +244,7 @@ export async function ReportListRow({ report, showType = false }: { report: Repo
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <p className="shrink-0 text-sm font-bold">{when}</p>
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{groupName}</p>
           {report.type === "fellowship" && (
             <p className="shrink-0 text-sm">
               <span className="font-bold">{report.attendees}</span>
@@ -258,8 +268,7 @@ export async function ReportListRow({ report, showType = false }: { report: Repo
 }
 
 /** Expenditure row: the amount, the group, then the date and what it was spent on. */
-export async function ExpenseListRow({ report }: { report: FellowshipReport }) {
-  const [group] = await groupAndFiler(report);
+export function ExpenseListRow({ report, groupName }: { report: FellowshipReport; groupName?: string }) {
   return (
     <Link
       href={`/reports/${report.id}`}
@@ -269,7 +278,7 @@ export async function ExpenseListRow({ report }: { report: FellowshipReport }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <p className="shrink-0 text-sm font-bold">{formatRupees(report.expenseAmount ?? 0)}</p>
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{group?.name}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-brand-700">{groupName}</p>
         </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
           {formatShortDateTimeDay(report.date, report.time)}
@@ -296,9 +305,15 @@ function ModeCell({ mode }: { mode: FollowUpReport["mode"] }) {
 }
 
 /** Column-aligned table of follow-ups for the all-groups view. */
-export async function FollowUpTable({ reports }: { reports: FollowUpReport[] }) {
-  const [groups, shown] = await Promise.all([getGroups({ includeClosed: true }), getNameDisplay()]);
-  const groupNames = new Map(groups.map((g) => [g.id, g.name]));
+export function FollowUpTable({
+  reports,
+  groupNames,
+  shown,
+}: {
+  reports: FollowUpReport[];
+  groupNames: Map<string, string>;
+  shown: NameDisplay;
+}) {
   return (
     <div
       role="table"
@@ -407,13 +422,23 @@ function NextFellowshipDetail({ report }: { report: NextFellowship }) {
 }
 
 /** Full read-only view of a report; also used for the post-submit confirmation. */
-export async function ReportDetail({ report }: { report: Report }) {
-  const [group, filedBy, shown] = await groupAndFiler(report);
+export function ReportDetail({
+  report,
+  groupName,
+  filerName,
+  shown,
+}: {
+  report: Report;
+  groupName?: string;
+  filerName?: string;
+  shown: NameDisplay;
+}) {
+  const filedBy = filedByLabel(filerName, shown);
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <ReportIdentity report={report} groupName={group?.name} large />
+          <ReportIdentity report={report} groupName={groupName} large />
         </div>
         {report.type === "next-fellowship" && <UpcomingBadge report={report} />}
       </div>

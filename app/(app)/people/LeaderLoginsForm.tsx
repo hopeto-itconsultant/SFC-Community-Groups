@@ -7,6 +7,7 @@ import { LeaderDetailFields } from "@/components/LeaderDetailFields";
 import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, EmptyState, SectionTitle } from "@/components/ui";
 import { loginAsLeader } from "@/lib/actions/auth";
+import { clearPageCache } from "@/lib/page-cache";
 import { addRosterMember, resetLeaderPassword, saveLeaderRecord, type AddMemberState, type IssuedLogin } from "@/lib/actions/people";
 import { DEFAULT_COUNTRY_ISO, combineMobile, splitMobile } from "@/lib/countries";
 import type { LeaderRosterGroup, LeaderRosterMember } from "@/lib/data-access";
@@ -245,6 +246,7 @@ export function LeaderLoginsForm({
     setLoginAsId(row.id);
     startSave(async () => {
       try {
+        clearPageCache();
         const result = await loginAsLeader(row.id);
         if (result?.error) {
           setRowErrors((current) => ({ ...current, [row.id]: result.error ?? "Could not open that login." }));

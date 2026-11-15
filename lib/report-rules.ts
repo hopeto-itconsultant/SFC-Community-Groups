@@ -82,6 +82,8 @@ export interface ReportQuery {
   period?: ReportPeriod;
   /** Only fellowship reports that recorded an expense. */
   withExpense?: boolean;
+  /** Stop after this many rows. Omit to load the whole filtered set. */
+  limit?: number;
 }
 
 export interface ReportTypeSummaries {

@@ -1,55 +1,65 @@
-import { GroupProfile } from "@/components/groups";
-import { PageHeader } from "@/components/PageHeader";
-import { NextFellowshipSummary } from "@/components/reports";
+import { CacheCommit } from "@/components/CachedPage";
+import { MyGroupCached } from "@/components/my-group-cache";
+import { MyGroupScreen } from "@/components/MyGroupScreen";
 import { NotAvailable, RoleGate } from "@/components/RoleGate";
-import { SavedBanner } from "@/components/SavedBanner";
-import { EmptyState, LinkButton, SectionTitle } from "@/components/ui";
-import { AssistantLeaders } from "@/app/(app)/people/[id]/AssistantLeaders";
-import { requireUser } from "@/lib/auth";
-import { getAssistantLeaders, getGroupById, getNextFellowship } from "@/lib/data-access";
+import { getNameDisplay, getRealUser, requireUser } from "@/lib/auth";
+import { getAssistantLeaders, getGroupDetail, getNextFellowship } from "@/lib/data-access";
+import { formatMemberNames } from "@/lib/group-card-model";
+import type { MyGroupModel } from "@/lib/page-models";
+import { scopeKeyForUser } from "@/lib/shell";
 
 export default async function MyGroupPage({ searchParams }: PageProps<"/group">) {
   const { saved } = await searchParams;
   return (
-    <RoleGate allow={["leader", "asst-leader"]}>
-      <MyGroup saved={saved === "updated"} />
-    </RoleGate>
+    <MyGroupCached>
+      <RoleGate allow={["leader", "asst-leader"]}>
+        <MyGroup saved={saved === "updated"} />
+      </RoleGate>
+    </MyGroupCached>
   );
 }
 
 async function MyGroup({ saved }: { saved: boolean }) {
-  const user = await requireUser();
-  const group = await getGroupById(user.groupId);
-  if (!group) return <NotAvailable message="You're not assigned to a group yet." />;
+  const [user, real] = await Promise.all([requireUser(), getRealUser()]);
+  if (!user.groupId) return <NotAvailable message="You're not assigned to a group yet." />;
   const isLeader = user.role === "leader";
-  const [next, assistants] = await Promise.all([
-    getNextFellowship(group.id),
-    isLeader ? getAssistantLeaders([group.id], user.id) : Promise.resolve([]),
+  const [detail, shown, next, assistants] = await Promise.all([
+    getGroupDetail(user.groupId),
+    getNameDisplay(),
+    getNextFellowship(user.groupId),
+    isLeader ? getAssistantLeaders([user.groupId], user.id) : Promise.resolve([]),
   ]);
+  if (!detail) return <NotAvailable message="You're not assigned to a group yet." />;
+
+  const model: MyGroupModel = {
+    group: {
+      id: detail.group.id,
+      name: detail.group.name,
+      category: detail.group.category,
+      frequency: detail.group.frequency,
+      photo: detail.group.photo,
+      status: detail.group.status,
+      closedAt: detail.group.closedAt,
+    },
+    leaders: formatMemberNames(detail.leaders, shown),
+    assistants: formatMemberNames(detail.assistants, shown),
+    hideAssistants: isLeader,
+    savedTitle: saved ? `${detail.group.name} updated` : undefined,
+    next: next
+      ? {
+          id: next.id,
+          date: next.proposedDate,
+          time: next.time,
+          location: next.location,
+          activity: next.activity,
+        }
+      : null,
+  };
+  const loginAsId = real && real.id !== user.id ? user.id : null;
 
   return (
-    <>
-      <PageHeader title="My Group" />
-      <div className="p-4">
-        {saved && <SavedBanner title={`${group.name} updated`} />}
-        <GroupProfile group={group} hideAssistants={isLeader} />
-        <LinkButton href={`/groups/${group.id}/edit`} variant="secondary" block className="mt-3">
-          Edit group profile
-        </LinkButton>
-
-        {isLeader && <AssistantLeaders assistants={assistants} showGroups={false} />}
-
-        <SectionTitle>Next Fellowship</SectionTitle>
-        {next ? (
-          <NextFellowshipSummary report={next} />
-        ) : (
-          <EmptyState title="No fellowship planned yet" />
-        )}
-
-        <LinkButton href="/reports" variant="secondary" block className="mt-4">
-          View group reports
-        </LinkButton>
-      </div>
-    </>
+    <CacheCommit scopeKey={scopeKeyForUser(user, loginAsId)} pageKey="my-group" data={{ ...model, savedTitle: undefined }}>
+      <MyGroupScreen model={model} assistants={isLeader ? assistants : undefined} />
+    </CacheCommit>
   );
 }

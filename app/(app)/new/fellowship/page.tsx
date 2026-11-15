@@ -15,10 +15,12 @@ export default function NewFellowshipPage() {
 
 async function NewFellowship() {
   const user = await requireUser();
-  const group = await getGroupById(user.groupId);
+  if (!user.groupId) return <NotAvailable message="You're not assigned to a group yet." />;
+  const [group, plans] = await Promise.all([
+    getGroupById(user.groupId),
+    getFileableFellowshipPlans(user.groupId),
+  ]);
   if (!group) return <NotAvailable message="You're not assigned to a group yet." />;
-
-  const plans = await getFileableFellowshipPlans(group.id);
 
   return (
     <>

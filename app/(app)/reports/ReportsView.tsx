@@ -1,28 +1,17 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import type { FellowshipReport, FollowUpReport, Report, ReportType, User } from "@/data/types";
-import { PlusIcon, XIcon } from "@/components/icons";
+import type { FellowshipReport, FollowUpReport, ReportType, User } from "@/data/types";
+import { PlusIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
-import { ReportCalendar, type ReportDayMarker } from "@/components/ReportCalendar";
-import {
-  CARD_LABELS,
-  ExpenseListRow,
-  FellowshipListRow,
-  FollowUpTable,
-  ReportListRow,
-  ReportListShell,
-  ReportTypeCard,
-} from "@/components/reports";
-import { EmptyState, LinkButton } from "@/components/ui";
-import { ReportLayoutSwitch } from "@/components/ViewToggle";
-import { getGroupById, getGroups, getReportTypeSummaries, getReports } from "@/lib/data-access";
-import { CONTACT_MODES, formatRupees } from "@/lib/format";
-import { getReportDate, type ReportPeriod } from "@/lib/report-rules";
+import { RemovePeriodChip, ReportResults, type ReportListItem } from "@/components/ReportResults";
+import { CARD_LABELS } from "@/components/reports";
+import { LinkButton } from "@/components/ui";
+import { getGroupById, getGroupChoices, getLabeledReports } from "@/lib/data-access";
+import { getNameDisplay } from "@/lib/auth";
+import { CONTACT_MODES, NOT_AVAILABLE, formatRupees } from "@/lib/format";
+import { type ReportPeriod } from "@/lib/report-rules";
 import { isAdminRole } from "@/lib/roles";
 import { GroupSelect } from "./GroupSelect";
 import { type ReportsParams, reportsHref } from "./hrefs";
-
-const REPORT_TYPES: ReportType[] = ["fellowship", "follow-up", "next-fellowship"];
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   "this-month": "Filed this month",
@@ -34,23 +23,8 @@ const PERIOD_TITLES: Record<ReportPeriod, string> = {
   upcoming: "Upcoming",
 };
 
-/** Admins pick any group (or all); leaders and asst. leaders are fixed to their own. */
-async function groupScope(user: User, requestedGroupId: string | undefined) {
-  const isAdmin = isAdminRole(user.role);
-  const group = await getGroupById(isAdmin ? requestedGroupId : user.groupId);
-  return {
-    isAdmin,
-    groupId: group?.id,
-    subtitle: isAdmin ? (group?.name ?? "All groups") : group?.name,
-  };
-}
-
 function FilterBar({ children }: { children: ReactNode }) {
-  return (
-    <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">
-      {children}
-    </div>
-  );
+  return <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">{children}</div>;
 }
 
 function NewReportButton({ href, label }: { href: string; label: string }) {
@@ -62,6 +36,7 @@ function NewReportButton({ href, label }: { href: string; label: string }) {
   );
 }
 
+/** Filtered report list. The overview (no type, period, or expenses) is cached separately. */
 export async function ReportsView({
   user,
   groupId,
@@ -75,137 +50,37 @@ export async function ReportsView({
   period?: ReportPeriod;
   expenses?: boolean;
 }) {
-  const scope = await groupScope(user, groupId);
-  if (expenses || type || period) {
-    return (
-      <ReportsTypeList
-        scope={scope}
-        type={expenses ? "fellowship" : type}
-        period={period}
-        expenses={expenses}
-      />
-    );
-  }
-  return <ReportsOverview scope={scope} />;
-}
-
-type Scope = Awaited<ReturnType<typeof groupScope>>;
-
-async function ReportsOverview({ scope: { isAdmin, groupId, subtitle } }: { scope: Scope }) {
-  const summaries = await getReportTypeSummaries(groupId);
-  const group = isAdmin ? groupId : undefined;
-
-  return (
-    <>
-      <PageHeader
-        title="Reports"
-        subtitle={subtitle}
-        action={!isAdmin && <NewReportButton href="/new" label="New Report" />}
-      />
-
-      <div className="grid grid-cols-1 gap-2.5 px-4 py-3 @md:grid-cols-2">
-        {REPORT_TYPES.map((type) => (
-          <ReportTypeCard key={type} kind={type} summaries={summaries} href={reportsHref({ type, group })} />
-        ))}
-        <ReportTypeCard
-          kind="expenditure"
-          summaries={summaries}
-          href={reportsHref({ expenses: true, group })}
-        />
-      </div>
-    </>
-  );
-}
-
-/** Keeps getReports order, including the order of reports on the same day. */
-function groupReportsByDate(reports: Report[]): Map<string, Report[]> {
-  const grouped = new Map<string, Report[]>();
-  for (const report of reports) {
-    const iso = getReportDate(report);
-    const day = grouped.get(iso);
-    if (day) day.push(report);
-    else grouped.set(iso, [report]);
-  }
-  return grouped;
-}
-
-function ReportCollection({
-  reports,
-  expenses,
-  fellowshipListing,
-  followUpTable,
-}: {
-  reports: Report[];
-  expenses: boolean;
-  fellowshipListing: boolean;
-  followUpTable: boolean;
-}) {
-  if (fellowshipListing) {
-    const fellowshipReports = reports.filter((r): r is FellowshipReport => r.type === "fellowship");
-    return (
-      <ReportListShell>
-        {fellowshipReports.map((r) => (
-          <FellowshipListRow key={r.id} report={r} />
-        ))}
-      </ReportListShell>
-    );
-  }
-
-  if (followUpTable) {
-    const followUpReports = reports.filter((r): r is FollowUpReport => r.type === "follow-up");
-    return <FollowUpTable reports={followUpReports} />;
-  }
-
-  const showType = new Set(reports.map((r) => r.type)).size > 1;
-  return (
-    <ReportListShell>
-      {reports.map((r) =>
-        expenses && r.type === "fellowship" ? (
-          <ExpenseListRow key={r.id} report={r} />
-        ) : (
-          <ReportListRow key={r.id} report={r} showType={showType} />
-        ),
-      )}
-    </ReportListShell>
-  );
-}
-
-async function AdminGroupFilter({ params }: { params: ReportsParams }) {
-  const groups = await getGroups();
-  return (
-    <FilterBar>
-      <GroupSelect groups={groups.map(({ id, name }) => ({ id, name }))} params={params} />
-    </FilterBar>
-  );
-}
-
-async function ReportsTypeList({
-  scope: { isAdmin, groupId, subtitle },
-  type,
-  period,
-  expenses,
-}: {
-  scope: Scope;
-  type?: ReportType;
-  period?: ReportPeriod;
-  expenses: boolean;
-}) {
-  const reports = await getReports({ groupId, type, period, withExpense: expenses });
-  const namedGroups = await Promise.all([...new Set(reports.map((r) => r.groupId))].map((id) => getGroupById(id)));
-  const groupNames = new Map(namedGroups.flatMap((group) => (group ? [[group.id, group.name] as const] : [])));
-  const markers: ReportDayMarker[] = reports.map((report) => ({
-    id: report.id,
-    date: getReportDate(report),
-    type: report.type,
-    groupName: groupNames.get(report.groupId) ?? "",
+  const isAdmin = isAdminRole(user.role);
+  const requestedId = isAdmin ? groupId : user.groupId;
+  const [group, choices, shown] = await Promise.all([
+    getGroupById(requestedId),
+    isAdmin ? getGroupChoices() : Promise.resolve([]),
+    getNameDisplay(),
+  ]);
+  // An unknown group id means every group, matching the previous lookup.
+  const scopedGroupId = group?.id;
+  const labeled = await getLabeledReports({
+    groupId: scopedGroupId,
+    type: expenses ? "fellowship" : type,
+    period,
+    withExpense: expenses,
+  });
+  const items: ReportListItem[] = labeled.map((item) => ({
+    report:
+      item.report.type === "follow-up"
+        ? { ...item.report, personName: shown(item.report.personName) }
+        : item.report,
+    groupName: item.groupName,
+    filerName: item.filerName ? shown(item.filerName) : NOT_AVAILABLE,
   }));
+  const reports = items.map((item) => item.report);
+  const subtitle = isAdmin ? (group?.name ?? "All groups") : group?.name;
   const params: ReportsParams = {
     type: expenses ? undefined : type,
     period,
     expenses,
-    group: isAdmin ? groupId : undefined,
+    group: isAdmin ? scopedGroupId : undefined,
   };
-
   const title = expenses
     ? CARD_LABELS.expenditure
     : type
@@ -213,34 +88,21 @@ async function ReportsTypeList({
       : period
         ? PERIOD_TITLES[period]
         : "All Reports";
-  const totalSpent = reports.reduce(
-    (sum, r) => sum + (r.type === "fellowship" ? (r.expenseAmount ?? 0) : 0),
-    0,
-  );
-  const allGroupsAdmin = isAdmin && !groupId && !expenses;
+  const totalSpent = reports.reduce((sum, report) => sum + (report.type === "fellowship" ? (report.expenseAmount ?? 0) : 0), 0);
+  const allGroupsAdmin = isAdmin && !scopedGroupId && !expenses;
   const fellowshipListing = allGroupsAdmin && type === "fellowship";
   const followUpTable = allGroupsAdmin && type === "follow-up";
-  const fellowshipReports = reports.filter((r): r is FellowshipReport => r.type === "fellowship");
-  const followUpReports = reports.filter((r): r is FollowUpReport => r.type === "follow-up");
-  const totalAttendees = fellowshipReports.reduce((sum, r) => sum + r.attendees, 0);
-  const totalFirstTimers = fellowshipReports.reduce((sum, r) => sum + r.firstTimers, 0);
-  const days: Record<string, ReactNode> = {};
-  for (const [date, dayReports] of groupReportsByDate(reports)) {
-    days[date] = (
-      <ReportCollection
-        reports={dayReports}
-        expenses={expenses}
-        fellowshipListing={fellowshipListing}
-        followUpTable={followUpTable}
-      />
-    );
-  }
+  const fellowshipReports = reports.filter((report): report is FellowshipReport => report.type === "fellowship");
+  const followUpReports = reports.filter((report): report is FollowUpReport => report.type === "follow-up");
+  const totalAttendees = fellowshipReports.reduce((sum, report) => sum + report.attendees, 0);
+  const totalFirstTimers = fellowshipReports.reduce((sum, report) => sum + report.firstTimers, 0);
   const upcomingList = type === "next-fellowship" && period !== "this-month";
   const emptyDescription = upcomingList
     ? "No upcoming fellowship planned."
-    : period || (isAdmin && groupId)
+    : period || (isAdmin && scopedGroupId)
       ? "Try a different filter."
       : "Nothing has been filed yet.";
+  const activeChoices = choices.filter((choice) => choice.status === "active");
 
   return (
     <>
@@ -258,10 +120,20 @@ async function ReportsTypeList({
         }
       />
 
-      {isAdmin && <AdminGroupFilter params={params} />}
+      {isAdmin && (
+        <FilterBar>
+          <GroupSelect groups={activeChoices.map(({ id, name }) => ({ id, name }))} params={params} />
+        </FilterBar>
+      )}
 
       <div className="p-4">
-        <ReportLayoutSwitch
+        <ReportResults
+          calendarKey={`${scopedGroupId ?? "all"}-${type ?? "all"}-${period ?? "any"}-${expenses}`}
+          items={items}
+          expenses={expenses}
+          fellowshipListing={fellowshipListing}
+          followUpTable={followUpTable}
+          emptyDescription={emptyDescription}
           summary={
             <p className="text-sm text-slate-500">
               {reports.length} report{reports.length === 1 ? "" : "s"}
@@ -278,12 +150,12 @@ async function ReportsTypeList({
                 </>
               )}
               {followUpTable &&
-                CONTACT_MODES.map((m) => (
-                  <span key={m.value}>
+                CONTACT_MODES.map((mode) => (
+                  <span key={mode.value}>
                     {" · "}
-                    {followUpReports.filter((r) => r.mode === m.value).length}{" "}
-                    <span role="img" aria-label={m.label}>
-                      {m.emoji}
+                    {followUpReports.filter((report) => report.mode === mode.value).length}{" "}
+                    <span role="img" aria-label={mode.label}>
+                      {mode.emoji}
                     </span>
                   </span>
                 ))}
@@ -291,39 +163,11 @@ async function ReportsTypeList({
           }
           periodChip={
             period && !upcomingList ? (
-              <Link
+              <RemovePeriodChip
                 href={reportsHref({ ...params, period: undefined })}
-                replace
-                aria-label={`Remove filter: ${PERIOD_LABELS[period]}`}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
-              >
-                {PERIOD_LABELS[period]}
-                <XIcon width={14} height={14} />
-              </Link>
+                label={PERIOD_LABELS[period]}
+              />
             ) : undefined
-          }
-          list={
-            reports.length ? (
-              <ReportCollection
-                reports={reports}
-                expenses={expenses}
-                fellowshipListing={fellowshipListing}
-                followUpTable={followUpTable}
-              />
-            ) : (
-              <EmptyState title="No reports found" description={emptyDescription} />
-            )
-          }
-          calendar={
-            reports.length ? (
-              <ReportCalendar
-                key={`${groupId ?? "all"}-${type ?? "all"}-${period ?? "any"}-${expenses}`}
-                markers={markers}
-                days={days}
-              />
-            ) : (
-              <EmptyState title="No reports found" description={emptyDescription} />
-            )
           }
         />
       </div>

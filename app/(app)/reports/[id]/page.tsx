@@ -4,8 +4,8 @@ import { ReportDetail } from "@/components/reports";
 import { NotAvailable } from "@/components/RoleGate";
 import { SavedBanner } from "@/components/SavedBanner";
 import { LinkButton } from "@/components/ui";
-import { getRealUser, requireUser } from "@/lib/auth";
-import { getGroupById, getReportById, isLatestFiledReport } from "@/lib/data-access";
+import { getNameDisplay, getRealUser, requireUser } from "@/lib/auth";
+import { getGroupById, getProfileNames, getReportById, isLatestFiledReport } from "@/lib/data-access";
 import { REPORT_TYPE_LABELS } from "@/lib/format";
 import { canEditFiledReport, canEditPlan } from "@/lib/report-rules";
 import { isSuperAdmin } from "@/lib/roles";
@@ -33,11 +33,14 @@ export default async function ReportDetailPage({ params, searchParams }: PagePro
   ]);
   const report = await getReportById(id);
   if (!report) return <NotAvailable message="This report could not be found." />;
-  const group = await getGroupById(report.groupId);
-  const canEditFiled =
-    !!group &&
-    (report.type === "fellowship" || report.type === "follow-up") &&
-    canEditFiledReport(user, report, group, await isLatestFiledReport(report));
+  const filed = report.type === "fellowship" || report.type === "follow-up" ? report : null;
+  const [group, latest, names, shown] = await Promise.all([
+    getGroupById(report.groupId),
+    filed ? isLatestFiledReport(filed) : Promise.resolve(false),
+    getProfileNames([report.filedBy]),
+    getNameDisplay(),
+  ]);
+  const canEditFiled = !!group && !!filed && canEditFiledReport(user, filed, group, latest);
   const canDelete = !!real && isSuperAdmin(real.role);
 
   const banner =
@@ -58,7 +61,7 @@ export default async function ReportDetailPage({ params, searchParams }: PagePro
       />
       <div className="p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         {banner && <SavedBanner title={banner} />}
-        <ReportDetail report={report} />
+        <ReportDetail report={report} groupName={group?.name} filerName={names.get(report.filedBy)} shown={shown} />
         {report.type === "next-fellowship" && canEditPlan(user, report) && <PlanActions planId={report.id} />}
         {canEditFiled && (
           <div className="mt-4">

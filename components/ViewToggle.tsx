@@ -50,6 +50,11 @@ export function reportLayoutFromStored(stored: string | null): ReportLayout {
   return stored === "calendar" ? "calendar" : "list";
 }
 
+/** Calendar/List preference for /reports, stored as `sfc.reportsLayout`. */
+export function useReportsPageLayout(): [ReportLayout, (view: ReportLayout) => void] {
+  return useStoredReportLayout(REPORTS_LAYOUT_KEY);
+}
+
 /** Calendar/List preference persisted in localStorage under `storageKey`; defaults to list. */
 export function useStoredReportLayout(storageKey: string): [ReportLayout, (view: ReportLayout) => void] {
   const view = useSyncExternalStore(

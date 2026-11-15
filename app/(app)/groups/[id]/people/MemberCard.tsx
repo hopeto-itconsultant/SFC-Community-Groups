@@ -7,6 +7,7 @@ import { PasswordStrengthMeter } from "@/components/PasswordStrength";
 import { MobileFields } from "@/components/MobileFields";
 import { Badge, Button, Card, ConfirmCard } from "@/components/ui";
 import { loginAsLeader } from "@/lib/actions/auth";
+import { clearPageCache } from "@/lib/page-cache";
 import { type LoginState, type MemberDetailsState, removeMember, setLogin, updateMemberDetails } from "@/lib/actions/people";
 import { copyText } from "@/lib/copy-text";
 import { DEFAULT_COUNTRY_ISO, splitMobile } from "@/lib/countries";
@@ -83,6 +84,7 @@ export function MemberCard({
               disabled={loggingInAs}
               onClick={() =>
                 startLoginAs(async () => {
+                  clearPageCache();
                   const result = await loginAsLeader(member.id);
                   if (result?.error) setError(result.error);
                 })

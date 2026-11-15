@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { LogOutIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
+import { clearPageCache } from "@/lib/page-cache";
 
 /** Submit control for the sign-out form. Disabled for the whole server action. */
 export function SignOutButton() {
@@ -28,6 +29,7 @@ export function SignOutButton() {
           return;
         }
         form?.setAttribute("data-locked", "");
+        clearPageCache();
       }}
     >
       <LogOutIcon width={20} height={20} />
