@@ -450,16 +450,18 @@ export interface UpcomingBrief {
   id: string;
   proposedDate: string;
   time?: string;
+  /** Meeting place from `reports.location`. Empty when the plan has none. */
+  location: string;
 }
 
 /** Soonest upcoming plan for each group, plus the total number of upcoming plans. */
 export const getUpcomingBriefs = cache(async (): Promise<{ byGroup: Map<string, UpcomingBrief>; count: number }> => {
   const supabase = await createClient();
-  const rows = unwrap<{ id: string; group_id: string; report_date: string }[]>(
+  const rows = unwrap<{ id: string; group_id: string; report_date: string; location: string | null }[]>(
     "upcoming fellowships",
     await supabase
       .from("reports")
-      .select("id, group_id, report_date")
+      .select("id, group_id, report_date, location")
       .eq("type", "next-fellowship")
       .is("cancelled_at", null)
       .gte("report_date", startOfDayTimestamp(todayISO()))
@@ -470,7 +472,12 @@ export const getUpcomingBriefs = cache(async (): Promise<{ byGroup: Map<string, 
   for (const row of rows) {
     if (byGroup.has(row.group_id)) continue;
     const when = splitReportDateTime(row.report_date);
-    byGroup.set(row.group_id, { id: row.id, proposedDate: when.date, time: when.time });
+    byGroup.set(row.group_id, {
+      id: row.id,
+      proposedDate: when.date,
+      time: when.time,
+      location: row.location ?? "",
+    });
   }
   return { byGroup, count: rows.length };
 });

@@ -7,7 +7,7 @@ import type { GroupCardModel } from "@/lib/page-models";
 import { photoVariant } from "@/lib/photos";
 import { GroupAvatar } from "./GroupAvatar";
 import { GroupHeroPhoto } from "./GroupHeroPhoto";
-import { ChevronRightIcon } from "./icons";
+import { ChevronRightIcon, MapPinIcon } from "./icons";
 import { Badge, Card, InfoRow } from "./ui";
 
 function PeopleList({ names }: { names: string[] }) {
@@ -56,13 +56,47 @@ export function ClosedBadge() {
   return <Badge tone="slate">Closed</Badge>;
 }
 
-function NextWhen({ when, compact = false }: { when?: string; compact?: boolean }) {
-  if (!when) return null;
-  if (compact) return <p className="whitespace-nowrap text-xs font-semibold text-emerald-700">{when}</p>;
+/** Meeting place under an upcoming date. Renders nothing when the plan has no location. */
+export function MeetingLocation({
+  location,
+  className = "",
+}: {
+  location?: string | null;
+  className?: string;
+}) {
+  const place = typeof location === "string" ? location.trim() : "";
+  if (!place) return null;
   return (
-    <span className="shrink-0 self-start whitespace-nowrap">
-      <Badge tone="green">Next {when}</Badge>
+    <span className={`flex min-w-0 items-start gap-1 text-xs text-slate-500 ${className}`}>
+      <MapPinIcon width={12} height={12} className="mt-0.5 shrink-0 text-slate-400" />
+      <span className="min-w-0 break-words">{place}</span>
     </span>
+  );
+}
+
+function NextWhen({
+  when,
+  location,
+  compact = false,
+}: {
+  when?: string;
+  location?: string;
+  compact?: boolean;
+}) {
+  if (!when) return null;
+  if (compact) {
+    return (
+      <div className="min-w-0">
+        <p className="whitespace-nowrap text-xs font-semibold text-emerald-700">{when}</p>
+        <MeetingLocation location={location} className="mt-0.5" />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-1 min-w-0">
+      <Badge tone="green">Next {when}</Badge>
+      <MeetingLocation location={location} className="mt-1" />
+    </div>
   );
 }
 
@@ -74,14 +108,18 @@ export function GroupMiniCard({ group }: { group: GroupCardModel }) {
       prefetch={false}
       className="cv-item flex h-full flex-col gap-1.5 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200/70 active:bg-slate-50"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <GroupAvatar group={group} size="xs" />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
           <p className={`break-words text-xs leading-snug ${group.hasLeaders ? "text-slate-600" : "text-slate-400"}`}>
             {group.leadersLabel}
           </p>
-          {group.closed ? <ClosedBadge /> : <NextWhen when={group.nextWhen} compact />}
+          {group.closed ? (
+            <ClosedBadge />
+          ) : (
+            <NextWhen when={group.nextWhen} location={group.nextLocation} compact />
+          )}
         </div>
       </div>
     </Link>
@@ -157,7 +195,7 @@ export function GroupSummaryRow({ group }: { group: GroupCardModel }) {
             <ClosedBadge />
           </span>
         ) : (
-          <NextWhen when={group.nextWhen} />
+          <NextWhen when={group.nextWhen} location={group.nextLocation} />
         )}
       </div>
       <ChevronRightIcon width={18} height={18} className="shrink-0 text-slate-400" />

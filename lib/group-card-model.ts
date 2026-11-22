@@ -26,6 +26,7 @@ export function toGroupCardModel(
     leaders,
     assistants,
     nextWhen: next ? formatShortDateTimeDay(next.proposedDate, next.time) : undefined,
+    nextLocation: next?.location.trim() || undefined,
     closed: isGroupClosed(entry.group),
   };
 }
