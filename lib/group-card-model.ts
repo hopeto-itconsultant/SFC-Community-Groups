@@ -1,4 +1,5 @@
 import { NOT_ASSIGNED, formatShortDateTimeDay } from "@/lib/format";
+import { isConfirmedLocation } from "@/lib/location";
 import { isGroupClosed } from "@/lib/report-rules";
 import type { DirectoryPerson, GroupDirectoryEntry, UpcomingBrief } from "@/lib/data-access";
 import type { GroupCardModel } from "@/lib/page-models";
@@ -10,6 +11,7 @@ export function toGroupCardModel(
 ): GroupCardModel {
   const leaders = entry.leaders.map((person) => shown(person.name));
   const assistants = entry.assistants.map((person) => shown(person.name));
+  const place = next?.location;
   return {
     id: entry.group.id,
     name: entry.group.name,
@@ -26,7 +28,7 @@ export function toGroupCardModel(
     leaders,
     assistants,
     nextWhen: next ? formatShortDateTimeDay(next.proposedDate, next.time) : undefined,
-    nextLocation: next?.location.trim() || undefined,
+    nextLocation: isConfirmedLocation(place) ? place.trim() : undefined,
     closed: isGroupClosed(entry.group),
   };
 }

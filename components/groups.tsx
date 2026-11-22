@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { CommunityGroup } from "@/data/types";
 import { FREQUENCY_LABELS, NOT_ASSIGNED, formatDate } from "@/lib/format";
+import { isConfirmedLocation, shortLocation } from "@/lib/location";
 import type { GroupCardModel } from "@/lib/page-models";
 import { photoVariant } from "@/lib/photos";
 import { GroupAvatar } from "./GroupAvatar";
@@ -56,7 +57,7 @@ export function ClosedBadge() {
   return <Badge tone="slate">Closed</Badge>;
 }
 
-/** Meeting place under an upcoming date. Renders nothing when the plan has no location. */
+/** Meeting place under an upcoming date. One line; nothing when the place is blank or unconfirmed. */
 export function MeetingLocation({
   location,
   className = "",
@@ -64,12 +65,14 @@ export function MeetingLocation({
   location?: string | null;
   className?: string;
 }) {
-  const place = typeof location === "string" ? location.trim() : "";
-  if (!place) return null;
+  if (!isConfirmedLocation(location)) return null;
+  const full = location.trim();
   return (
-    <span className={`flex min-w-0 items-start gap-1 text-xs text-slate-500 ${className}`}>
-      <MapPinIcon width={12} height={12} className="mt-0.5 shrink-0 text-slate-400" />
-      <span className="min-w-0 break-words">{place}</span>
+    <span className={`flex w-full min-w-0 items-center gap-1 overflow-hidden text-xs text-slate-500 ${className}`}>
+      <MapPinIcon width={12} height={12} className="shrink-0 text-slate-400" />
+      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={full}>
+        {shortLocation(full)}
+      </span>
     </span>
   );
 }
@@ -86,14 +89,14 @@ function NextWhen({
   if (!when) return null;
   if (compact) {
     return (
-      <div className="min-w-0">
+      <div className="min-w-0 overflow-hidden">
         <p className="whitespace-nowrap text-xs font-semibold text-emerald-700">{when}</p>
         <MeetingLocation location={location} className="mt-0.5" />
       </div>
     );
   }
   return (
-    <div className="mt-1 min-w-0">
+    <div className="mt-1 min-w-0 overflow-hidden">
       <Badge tone="green">Next {when}</Badge>
       <MeetingLocation location={location} className="mt-1" />
     </div>
@@ -110,7 +113,7 @@ export function GroupMiniCard({ group }: { group: GroupCardModel }) {
     >
       <div className="flex items-start gap-2">
         <GroupAvatar group={group} size="xs" />
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="min-w-0 flex-1 space-y-0.5 overflow-hidden">
           <p className="break-words text-sm font-semibold leading-snug">{group.name}</p>
           <p className={`break-words text-xs leading-snug ${group.hasLeaders ? "text-slate-600" : "text-slate-400"}`}>
             {group.leadersLabel}
@@ -185,7 +188,7 @@ export function GroupSummaryRow({ group }: { group: GroupCardModel }) {
       className="flex items-center gap-3 px-3 py-2.5 active:bg-slate-50"
     >
       <GroupAvatar group={group} size="sm" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="break-words text-[15px] font-semibold">{group.name}</p>
         <p className={`break-words text-xs ${group.hasLeaders ? "text-slate-500" : "text-slate-400"}`}>
           {group.leadersLabel}
