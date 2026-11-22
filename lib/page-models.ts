@@ -17,8 +17,17 @@ export interface GroupCardModel {
   leaders: string[];
   assistants: string[];
   nextWhen?: string;
+  /** Meeting place for `nextWhen`. Omitted when the plan has no location. */
+  nextLocation?: string;
   closed: boolean;
 }
+
+/**
+ * On-device key for the Home snapshot. Bump when HomeModel gains a field the
+ * first paint must show, so an older snapshot is not reused.
+ * v2 adds `nextLocation` under each upcoming date on the admin cards.
+ */
+export const HOME_PAGE_KEY = "home.v2";
 
 export type HomeModel =
   | {

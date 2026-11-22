@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { GroupDirectory } from "@/components/GroupDirectory";
-import { StatCard } from "@/components/groups";
+import { MeetingLocation, StatCard } from "@/components/groups";
 import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, FileTextIcon } from "@/components/icons";
 import { InstallBanner } from "@/components/InstallBanner";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
@@ -88,7 +88,7 @@ function StatusRow({
       <div className="min-w-0 flex-1">
         <p className="break-words text-[15px] font-semibold">{label}</p>
         <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 break-words text-xs text-slate-500">{detail}</p>
+          <p className="min-w-0 flex-1 overflow-hidden text-xs text-slate-500">{detail}</p>
           {badge && <span className="shrink-0">{badge}</span>}
         </div>
       </div>
@@ -198,7 +198,7 @@ export function HomeScreen({ model }: { model: HomeModel }) {
               icon={<DateCalendarIcon date={model.next.date} />}
               framedIcon={false}
               label={`Next · ${model.next.when}`}
-              detail={model.next.location}
+              detail={<MeetingLocation location={model.next.location} />}
               badge={<Badge tone="green">Upcoming</Badge>}
             />
           ) : (

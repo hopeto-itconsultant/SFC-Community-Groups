@@ -13,7 +13,7 @@ import {
 } from "@/lib/data-access";
 import { toGroupCardModel } from "@/lib/group-card-model";
 import { ROLE_LABELS, formatRupees, formatShortDateTimeDay } from "@/lib/format";
-import type { HomeModel } from "@/lib/page-models";
+import { HOME_PAGE_KEY, type HomeModel } from "@/lib/page-models";
 import { isAdminRole } from "@/lib/roles";
 import { scopeKeyForUser } from "@/lib/shell";
 
@@ -30,7 +30,7 @@ async function HomeContent() {
   const model = await loadHome(user);
   const loginAsId = real && real.id !== user.id ? user.id : null;
   return (
-    <CacheCommit scopeKey={scopeKeyForUser(user, loginAsId)} pageKey="home" data={model}>
+    <CacheCommit scopeKey={scopeKeyForUser(user, loginAsId)} pageKey={HOME_PAGE_KEY} data={model}>
       <HomeScreen model={model} />
     </CacheCommit>
   );
