@@ -7,7 +7,7 @@ import { CalendarIcon, ChevronRightIcon, DateCalendarIcon, FileTextIcon } from "
 import { InstallBanner } from "@/components/InstallBanner";
 import { Badge, Card, EmptyState, LinkButton, SectionTitle } from "@/components/ui";
 import { APP_NAME, LOGO_SRC } from "@/lib/brand";
-import type { HomeModel } from "@/lib/page-models";
+import { sortGroupsByNextFellowship, type HomeModel } from "@/lib/page-models";
 
 const ACTIONS: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/new/fellowship", label: "Fellowship", icon: "📝" },
@@ -138,7 +138,7 @@ export function HomeScreen({ model }: { model: HomeModel }) {
               title="CG Status"
               placement="section"
               variant="mini"
-              groups={model.groups}
+              groups={sortGroupsByNextFellowship(model.groups)}
             />
           ) : (
             <>

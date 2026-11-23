@@ -13,7 +13,7 @@ import {
 } from "@/lib/data-access";
 import { toGroupCardModel } from "@/lib/group-card-model";
 import { ROLE_LABELS, formatRupees, formatShortDateTimeDay } from "@/lib/format";
-import { HOME_PAGE_KEY, type HomeModel } from "@/lib/page-models";
+import { HOME_PAGE_KEY, sortGroupsByNextFellowship, type HomeModel } from "@/lib/page-models";
 import { isAdminRole } from "@/lib/roles";
 import { scopeKeyForUser } from "@/lib/shell";
 
@@ -90,6 +90,8 @@ async function loadHome(user: Awaited<ReturnType<typeof requireUser>>): Promise<
     groupCount: entries.length,
     reportsThisMonth,
     planned: upcoming.count,
-    groups: entries.map((entry) => toGroupCardModel(entry, shown, upcoming.byGroup.get(entry.group.id))),
+    groups: sortGroupsByNextFellowship(
+      entries.map((entry) => toGroupCardModel(entry, shown, upcoming.byGroup.get(entry.group.id))),
+    ),
   };
 }

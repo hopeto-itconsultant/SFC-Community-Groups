@@ -103,7 +103,7 @@ function NextWhen({
   );
 }
 
-/** Small tappable card for the Admin dashboard grid (two per row). */
+/** Small tappable card for the Admin dashboard grid (two per row, three from tablet up). */
 export function GroupMiniCard({ group }: { group: GroupCardModel }) {
   return (
     <Link

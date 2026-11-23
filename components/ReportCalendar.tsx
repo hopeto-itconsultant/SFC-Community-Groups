@@ -118,7 +118,7 @@ export function ReportCalendar({
   }
 
   return (
-    <div className="@md:grid @md:grid-cols-2 @md:items-start @md:gap-4">
+    <div className="flex flex-col gap-4">
       <div>
         <div className="mb-2 flex items-center justify-between px-1">
           <button
@@ -188,7 +188,7 @@ export function ReportCalendar({
       </div>
 
       {selected && (
-        <section className="@container mt-4 @md:mt-0" aria-label={`Reports on ${formatDate(selected)}`}>
+        <section className="@container" aria-label={`Reports on ${formatDate(selected)}`}>
           <h3 className="mb-2 px-1 text-sm font-semibold">{formatDate(selected)}</h3>
           {days[selected] ?? <p className="px-1 text-sm text-slate-500">No reports on this day.</p>}
         </section>
