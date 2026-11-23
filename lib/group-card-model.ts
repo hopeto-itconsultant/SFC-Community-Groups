@@ -1,4 +1,4 @@
-import { NOT_ASSIGNED, formatShortDateTimeDay } from "@/lib/format";
+import { NOT_ASSIGNED, combineDateAndTime, formatShortDateTimeDay } from "@/lib/format";
 import { isConfirmedLocation } from "@/lib/location";
 import { isGroupClosed } from "@/lib/report-rules";
 import type { DirectoryPerson, GroupDirectoryEntry, UpcomingBrief } from "@/lib/data-access";
@@ -28,6 +28,7 @@ export function toGroupCardModel(
     leaders,
     assistants,
     nextWhen: next ? formatShortDateTimeDay(next.proposedDate, next.time) : undefined,
+    nextAt: next ? combineDateAndTime(next.proposedDate, next.time) : undefined,
     nextLocation: isConfirmedLocation(place) ? place.trim() : undefined,
     closed: isGroupClosed(entry.group),
   };

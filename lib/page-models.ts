@@ -17,6 +17,11 @@ export interface GroupCardModel {
   leaders: string[];
   assistants: string[];
   nextWhen?: string;
+  /**
+   * Local timestamp of `nextWhen` (`YYYY-MM-DDTHH:MM:SS`). Omitted when the
+   * group has no upcoming fellowship. Home sorts on this, including from cache.
+   */
+  nextAt?: string;
   /** Meeting place for `nextWhen`. Omitted when the plan has no location. */
   nextLocation?: string;
   closed: boolean;
@@ -26,8 +31,9 @@ export interface GroupCardModel {
  * On-device key for the Home snapshot. Bump when HomeModel gains a field the
  * first paint must show, so an older snapshot is not reused.
  * v2 adds `nextLocation` under each upcoming date on the admin cards.
+ * v3 adds `nextAt` so cached admin cards sort by the next fellowship.
  */
-export const HOME_PAGE_KEY = "home.v2";
+export const HOME_PAGE_KEY = "home.v3";
 
 export type HomeModel =
   | {
@@ -76,6 +82,21 @@ export interface MyGroupModel {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
+}
+
+/**
+ * Soonest upcoming fellowship first. Groups with no plan follow, ordered by name.
+ * Same instant keeps name order, then id, so a cached snapshot paints in that order.
+ */
+export function sortGroupsByNextFellowship(groups: GroupCardModel[]): GroupCardModel[] {
+  return [...groups].sort((a, b) => {
+    if (a.nextAt && b.nextAt && a.nextAt !== b.nextAt) return a.nextAt < b.nextAt ? -1 : 1;
+    if (a.nextAt && !b.nextAt) return -1;
+    if (!a.nextAt && b.nextAt) return 1;
+    const byName = a.name.localeCompare(b.name);
+    if (byName !== 0) return byName;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 export function isHomeModel(value: unknown): value is HomeModel {
